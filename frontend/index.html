@@ -224,6 +224,8 @@ const chatList = $("#chatList"), headerTitle = $("#headerTitle"), searchInput = 
 /* ---------- store (localStorage) ---------- */
 const STORAGE_KEY = "lumen.v1";
 const PROMPTS = ["Revenue by region", "Monthly revenue trend", "Discount vs margin"];
+const MAX_CHATS = 40;          // keep the newest N chats
+const MAX_HISTORY_TURNS = 6;   // prior user/assistant turns sent for context
 
 const store = {
   chats: [],
@@ -242,11 +244,20 @@ const store = {
     if (!this.chats.find(c => c.id === this.activeId)) this.activeId = this.chats[0].id;
   },
   save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        chats: this.chats, activeId: this.activeId, collapsed: this.collapsed, theme: this.theme,
-      }));
-    } catch (e) { /* private mode / quota — run without persistence */ }
+    if (this.chats.length > MAX_CHATS) this.chats = this.chats.slice(0, MAX_CHATS);
+    const persist = () => localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      chats: this.chats, activeId: this.activeId, collapsed: this.collapsed, theme: this.theme,
+    }));
+    for (let i = 0; i < MAX_CHATS; i++) {
+      try { persist(); return; }
+      catch (e) {
+        // Quota exceeded (or private mode). Drop the oldest chat and retry.
+        if (this.chats.length <= 1) return;
+        const dropped = this.chats.pop();
+        if (this.activeId === dropped.id) this.activeId = this.chats[0].id;
+        this.evicted = (this.evicted || 0) + 1;
+      }
+    }
   },
   active() { return this.chats.find(c => c.id === this.activeId); },
   newChat(save = true) {
@@ -275,7 +286,7 @@ function disposeThreadCharts() {
   });
 }
 
-function buildChartCard({ title, meta, spec, data }) {
+function buildChartCard({ title, meta, spec }) {
   const card = el("div", "card");
   const head = el("div", "card-head");
   const titleEl = el("div", "card-title"); titleEl.textContent = title; head.appendChild(titleEl);
@@ -323,16 +334,21 @@ function buildChartCard({ title, meta, spec, data }) {
     } else if (name === "Spec") {
       bodyEl.appendChild(el("div", "spec-view", esc(JSON.stringify(spec, null, 2))));
     } else {
+      // Data tab reads the rows bound into the spec (dataset.source is an
+      // array of row objects); no separate copy is stored.
+      const src = (spec && spec.dataset && Array.isArray(spec.dataset.source)) ? spec.dataset.source : [];
+      const cols = (src.length && !Array.isArray(src[0])) ? Object.keys(src[0]) : [];
       const t = el("table");
       const tr = el("tr");
-      data.columns.forEach(c => { const th = el("th"); th.textContent = c; tr.appendChild(th); });
+      cols.forEach(c => { const th = el("th"); th.textContent = c; tr.appendChild(th); });
       t.appendChild(tr);
-      data.rows.slice(0, 50).forEach(row => {
+      src.slice(0, 50).forEach(rowObj => {
         const r = el("tr");
-        row.forEach(v => r.appendChild(el("td", null, esc(v))));
+        cols.forEach(c => r.appendChild(el("td", null, esc(rowObj[c]))));
         t.appendChild(r);
       });
       const wrap = el("div"); wrap.style.overflow = "auto"; wrap.appendChild(t);
+      if (src.length > 50) wrap.appendChild(el("div", "card-meta", "Showing 50 of " + src.length + " rows"));
       bodyEl.appendChild(wrap);
     }
   }
@@ -502,6 +518,15 @@ function askDelete(chat) {
   document.body.appendChild(overlay);
 }
 
+function toast(text) {
+  clearTimeout(toastTimer);
+  $(".toast")?.remove();
+  const t = el("div", "toast");
+  t.appendChild(el("span", null, esc(text)));
+  document.body.appendChild(t);
+  toastTimer = setTimeout(() => t.remove(), 4000);
+}
+
 function showUndo(trash) {
   clearTimeout(toastTimer);
   $(".toast")?.remove();
@@ -572,6 +597,16 @@ async function send() {
   busy = true; sendBtn.disabled = true; draft.value = "";
 
   const chat = store.active();
+
+  // Prior turns for context: user questions + the agent's prose answers.
+  const history = [];
+  for (const m of chat.messages) {
+    if (m.role === "user") history.push({ role: "user", content: m.text });
+    else if (m.role === "agent" && m.paras && m.paras.length)
+      history.push({ role: "assistant", content: m.paras.join("\n\n") });
+  }
+  const trimmedHistory = history.slice(-MAX_HISTORY_TURNS);
+
   chat.messages.push({ role: "user", text });
   if (chat.title === "New chat") chat.title = text.length > 38 ? text.slice(0, 38) + "…" : text;
   const aMsg = { role: "agent", steps: [], paras: [], chart: null, error: null, time: null };
@@ -594,7 +629,7 @@ async function send() {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ session_id: chat.id, message: text }),
+      body: JSON.stringify({ session_id: chat.id, message: text, history: trimmedHistory }),
     });
   } catch (e) {
     agent.error("Network error: " + e);
@@ -625,7 +660,7 @@ async function send() {
       if (ev === "thinking") agent.thinking(d.label);
       else if (ev === "step") { agent.step(d.label, d.detail); aMsg.steps.push({ label: d.label, detail: d.detail }); }
       else if (ev === "text") { agent.text(d.text); aMsg.paras.push(d.text); }
-      else if (ev === "chart") { agent.chart(d); aMsg.chart = { title: d.title, meta: d.meta, spec: d.spec, data: d.data }; }
+      else if (ev === "chart") { agent.chart(d); aMsg.chart = { title: d.title, meta: d.meta, spec: d.spec }; }
       else if (ev === "error") { agent.error(d.message); aMsg.error = d.message; }
       else if (ev === "done") { agent.done(); aMsg.time = d.seconds; }
       thread.scrollTop = thread.scrollHeight;
@@ -633,6 +668,11 @@ async function send() {
   }
   chat.updatedAt = Date.now();
   store.save();
+  if (store.evicted) {
+    toast("Older chats dropped to free storage space");
+    store.evicted = 0;
+    renderSidebar();
+  }
   busy = false; sendBtn.disabled = false;
 }
 

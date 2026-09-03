@@ -50,6 +50,55 @@ def test_rows_to_records():
     assert recs == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
 
+def test_clean_history_sanitizes_turns():
+    turns = [
+        {"role": "assistant", "content": "leading assistant, dropped"},
+        {"role": "user", "content": "Q1"},
+        {"role": "user", "content": "Q1 (edited)"},   # consecutive -> keep last
+        {"role": "assistant", "content": "A1"},
+        {"role": "system", "content": "ignored"},
+        {"role": "user", "content": ""},              # empty -> skipped
+        {"role": "user", "content": "Q2"},
+    ]
+    assert orchestrator.clean_history(turns) == [
+        {"role": "user", "content": "Q1 (edited)"},
+        {"role": "assistant", "content": "A1"},
+        {"role": "user", "content": "Q2"},
+    ]
+
+
+def test_clean_history_caps_length():
+    turns = []
+    for i in range(20):
+        turns.append({"role": "user", "content": f"q{i}"})
+        turns.append({"role": "assistant", "content": f"a{i}"})
+    out = orchestrator.clean_history(turns)
+    assert len(out) == orchestrator.MAX_HISTORY_TURNS
+    assert out[-1] == {"role": "assistant", "content": "a19"}
+
+
+def test_run_seeds_prior_conversation(monkeypatch):
+    final = {
+        "answer": "ok", "chart_title": "t", "chart_meta": "m",
+        "echarts_option": {"series": [{"type": "bar"}]},
+    }
+    client = _client_returning(final)
+    type(client).calls = []
+    monkeypatch.setattr(llm, "get_client", lambda: client)
+    history = [
+        {"role": "user", "content": "revenue by region?"},
+        {"role": "assistant", "content": "North America leads."},
+    ]
+    orchestrator.run(
+        "now by month", [].append, history=history, data_fn=lambda q, s, **k: _dr()
+    )
+    # run_agent keeps appending to this list, so assert on the seeded prefix.
+    first_messages = type(client).calls[0]["messages"]
+    assert first_messages[0] == {"role": "user", "content": "revenue by region?"}
+    assert first_messages[1] == {"role": "assistant", "content": "North America leads."}
+    assert first_messages[2] == {"role": "user", "content": "now by month"}
+
+
 def test_validate_binds_dataset_source():
     option = {"series": [{"type": "bar"}], "xAxis": {"type": "category"}, "yAxis": {}}
     out = orchestrator.validate_echarts_option(option, [{"region": "NA", "rev": 8.4}])

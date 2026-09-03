@@ -19,9 +19,15 @@ _FRONTEND = Path(__file__).parent.parent / "frontend"
 app = FastAPI(title="Agent Chat Analytics")
 
 
+class Turn(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    history: list[Turn] = []
 
 
 _SENTINEL = object()
@@ -34,9 +40,11 @@ def chat(req: ChatRequest) -> StreamingResponse:
     def sink(event: events.Event) -> None:
         q.put(event)
 
+    history = [t.model_dump() for t in req.history]
+
     def worker() -> None:
         try:
-            orchestrator_run(req.message, sink)
+            orchestrator_run(req.message, sink, history=history)
         except Exception as exc:  # noqa: BLE001 - reported to the client
             q.put(events.ErrorEvent(message=str(exc)))
             q.put(events.Done(seconds=0.0))

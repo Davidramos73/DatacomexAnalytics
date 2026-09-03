@@ -28,7 +28,13 @@ ECharts chart rules:
 - Do NOT set colors, fonts, or a `backgroundColor` - the UI applies a theme.
 
 Call query_data at least once before answering. Do not invent numbers.
+
+Earlier turns of this conversation may be provided for context. The user's
+latest message can build on them (e.g. "now break that down by month" or
+"same thing for EMEA") - resolve such references before writing data questions.
 """
+
+MAX_HISTORY_TURNS = 6
 
 _QUERY_DATA_TOOL = {
     "name": "query_data",
@@ -66,6 +72,25 @@ def rows_to_records(columns: list[str], rows: list[list]) -> list[dict]:
     return [dict(zip(columns, r)) for r in rows]
 
 
+def clean_history(turns) -> list[dict]:
+    """Coerce client-supplied turns into a valid alternating message list:
+    only user/assistant roles, non-empty, no consecutive same-role, starts
+    with a user turn, capped to the most recent MAX_HISTORY_TURNS."""
+    out: list[dict] = []
+    for t in turns or []:
+        role = t.get("role")
+        content = (t.get("content") or "").strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        if out and out[-1]["role"] == role:
+            out[-1] = {"role": role, "content": content}
+        else:
+            out.append({"role": role, "content": content})
+    while out and out[0]["role"] != "user":
+        out.pop(0)
+    return out[-MAX_HISTORY_TURNS:]
+
+
 def validate_echarts_option(option: dict, rows_records: list[dict]) -> dict:
     if not isinstance(option, dict):
         raise SpecError("option is not an object")
@@ -84,8 +109,15 @@ def validate_echarts_option(option: dict, rows_records: list[dict]) -> dict:
     return option
 
 
-def run(user_message: str, sink: llm.Sink, *, data_fn=answer_data_question) -> None:
+def run(
+    user_message: str,
+    sink: llm.Sink,
+    *,
+    history=None,
+    data_fn=answer_data_question,
+) -> None:
     started = time.monotonic()
+    prior = clean_history(history)
     sink(events.Thinking(label="Reading schema"))
 
     datasets: list = []
@@ -108,7 +140,7 @@ def run(user_message: str, sink: llm.Sink, *, data_fn=answer_data_question) -> N
     agent = llm.run_agent(
         model=LLM_MODEL,
         system=_SYSTEM,
-        messages=[{"role": "user", "content": user_message}],
+        messages=prior + [{"role": "user", "content": user_message}],
         tools=[_QUERY_DATA_TOOL],
         tool_impls={"query_data": _query_data},
         sink=sink,
