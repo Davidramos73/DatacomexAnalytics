@@ -5,20 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lumen Analyst</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
   html,body{margin:0;padding:0;height:100%}
   body{background:#faf9f8;color:#1c1b19;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   *{box-sizing:border-box}
   @keyframes dotpulse{0%,60%,100%{opacity:.25}30%{opacity:1}}
-  main{max-width:820px;margin:0 auto;display:flex;flex-direction:column;height:100vh}
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* sidebar */
+  .sidebar{flex:none;width:266px;display:flex;flex-direction:column;background:#f2f0ec;border-right:1px solid rgba(0,0,0,.07);overflow:hidden;transition:width .16s ease}
+  .sidebar.collapsed{width:56px}
+  .sidebar.collapsed .sb-hideable,
+  .sidebar.collapsed .sb-name,
+  .sidebar.collapsed .nc-label{display:none}
+  .sidebar.collapsed .sb-top,
+  .sidebar.collapsed .sb-actions{padding-left:8px;padding-right:8px}
+  .sb-top{display:flex;align-items:center;gap:9px;padding:14px 12px 10px}
+  .sb-logo{flex:none;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#3a53c9}
+  .sb-logo i{width:8px;height:8px;border-radius:2px;background:#fff}
+  .sb-name{flex:1;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden}
+  .icon-btn{flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:6px;cursor:pointer;color:#6b6864}
+  .icon-btn:hover{background:rgba(0,0,0,.06)}
+  .sb-actions{padding:2px 10px 8px;display:flex;flex-direction:column;gap:8px}
+  .new-chat{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:8px;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04);text-align:left}
+  .new-chat:hover{background:#fffdfa;border-color:rgba(0,0,0,.2)}
+  .sidebar.collapsed .new-chat{justify-content:center;padding:8px 0}
+  .search{display:flex;align-items:center;gap:7px;padding:7px 9px;background:rgba(0,0,0,.045);border-radius:8px}
+  .search input{flex:1;min-width:0;border:none;background:transparent;outline:none;font-size:12.5px;color:#1c1b19;font-family:inherit}
+  .sb-list{flex:1;overflow-y:auto;padding:6px 8px 8px}
+  .sb-section{padding:6px 8px 4px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9a968f}
+  .chat-row{display:flex;align-items:center;border-radius:8px;position:relative;margin-bottom:1px}
+  .chat-row:hover{background:rgba(0,0,0,.05)}
+  .chat-row.active{background:rgba(0,0,0,.065)}
+  .chat-row .sel{flex:1;min-width:0;text-align:left;padding:7px 9px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#2c2a27;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-row.active .sel{font-weight:600}
+  .chat-row .menu-btn{opacity:0;flex:none;width:24px;height:24px;margin-right:4px;border:none;background:transparent;border-radius:6px;cursor:pointer;color:#6b6864}
+  .chat-row:hover .menu-btn,.chat-row .menu-btn.open{opacity:1}
+  .chat-row .menu-btn:hover{background:rgba(0,0,0,.08)}
+  .chat-row .rename{flex:1;min-width:0;margin:3px 6px;padding:5px 7px;border:1px solid rgba(0,0,0,.2);border-radius:6px;font-size:13px;font-family:inherit;outline:none}
+  .menu-pop{position:absolute;right:6px;top:32px;z-index:40;width:154px;padding:5px;background:#fff;border:1px solid rgba(0,0,0,.09);border-radius:9px;box-shadow:0 8px 26px rgba(0,0,0,.14)}
+  .menu-pop button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:none;background:transparent;border-radius:6px;font-size:12.5px;color:#2c2a27;cursor:pointer;text-align:left}
+  .menu-pop button:hover{background:rgba(0,0,0,.05)}
+  .menu-pop button.danger{color:#b3261e}
+  .menu-pop button.danger:hover{background:rgba(179,38,30,.08)}
+  .sb-foot{flex:none;padding:9px 12px;border-top:1px solid rgba(0,0,0,.07);font-size:11px;color:#9a968f;white-space:nowrap;overflow:hidden}
+
+  /* main */
+  main{flex:1;min-width:0;display:flex;flex-direction:column}
   header{display:flex;align-items:center;gap:10px;padding:0 18px;height:52px;border-bottom:1px solid rgba(0,0,0,.06)}
-  .title{font-size:13.5px;font-weight:600}
-  .badge{display:flex;align-items:center;gap:5px;padding:3px 7px;background:rgba(0,0,0,.045);border-radius:6px;font-size:11px;color:#6b6864}
+  .title{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{flex:none;display:flex;align-items:center;gap:5px;padding:3px 7px;background:rgba(0,0,0,.045);border-radius:6px;font-size:11px;color:#6b6864}
   .badge span{width:5px;height:5px;border-radius:50%;background:#2f8f7a}
-  .thread{flex:1;overflow-y:auto;padding:26px 24px 40px;display:flex;flex-direction:column;gap:26px}
+  .grow{flex:1}
+  .engine{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b8781}
+  .thread{flex:1;overflow-y:auto;overflow-x:hidden}
+  .thread-inner{max-width:760px;margin:0 auto;padding:26px 24px 40px;display:flex;flex-direction:column;gap:26px}
   .user{align-self:flex-end;max-width:78%;padding:10px 14px;background:#ebe8e3;border-radius:14px 14px 4px 14px;font-size:14px;line-height:1.55}
   .agent{display:flex;gap:12px}
   .avatar{flex:none;width:24px;height:24px;border-radius:7px;margin-top:2px;background:#3a53c9}
@@ -48,109 +90,175 @@
   th,td{padding:6px 10px;border-bottom:1px solid rgba(0,0,0,.05);text-align:left}
   th{background:#f6f4f1;color:#7b776f;text-transform:uppercase;letter-spacing:.05em}
   .composer{flex:none;padding:0 24px 20px}
-  .composer-inner{display:flex;align-items:flex-end;gap:8px;padding:9px 9px 9px 14px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:14px}
+  .composer-inner{max-width:760px;margin:0 auto;display:flex;align-items:flex-end;gap:8px;padding:9px 9px 9px 14px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:14px}
   textarea{flex:1;border:none;outline:none;resize:none;font-size:14px;line-height:1.5;font-family:inherit;background:transparent;max-height:140px;padding:5px 0}
   .send{flex:none;width:32px;height:32px;border:none;border-radius:9px;cursor:pointer;color:#fff;background:#3a53c9;font-size:15px}
   .send:disabled{background:#c9c4bb}
-  .hint{margin-top:7px;text-align:center;font-size:11px;color:#a09b93}
-  .empty{margin:14vh auto 0;text-align:center;color:#6b6864;max-width:430px}
-  .empty h1{font-size:24px;color:#1c1b19}
+  .hint{max-width:760px;margin:7px auto 0;text-align:center;font-size:11px;color:#a09b93}
+  .empty{margin:14vh auto 0;text-align:center;color:#6b6864;max-width:440px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .empty h1{font-size:24px;color:#1c1b19;margin:0}
+  .empty p{margin:0;line-height:1.55}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .chips button{padding:8px 12px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:999px;font-size:12.5px;color:#2c2a27;cursor:pointer}
+  .chips button:hover{border-color:rgba(0,0,0,.28);background:#fffdfa}
+
+  .overlay{position:fixed;inset:0;z-index:60;background:rgba(28,27,25,.32);display:flex;align-items:center;justify-content:center;padding:24px}
+  .dialog{width:100%;max-width:360px;background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.24);padding:20px}
+  .dialog h3{margin:0;font-size:15px;font-weight:600}
+  .dialog p{margin:8px 0 0;font-size:13px;line-height:1.55;color:#6b6864}
+  .dialog .row{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .dialog button{padding:8px 13px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+  .dialog .cancel{border:1px solid rgba(0,0,0,.12);background:#fff;color:#1c1b19}
+  .dialog .confirm{border:none;background:#b3261e;color:#fff}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:70;display:flex;align-items:center;gap:12px;padding:9px 10px 9px 14px;background:#1c1b19;color:#fff;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.22);font-size:12.5px}
+  .toast button{border:none;background:rgba(255,255,255,.14);color:#fff;border-radius:6px;padding:4px 9px;font-size:12px;font-weight:500;cursor:pointer}
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <div class="title">Lumen Analyst</div>
-    <div class="badge"><span></span>warehouse · read only</div>
-  </header>
-  <div class="thread" id="thread">
-    <div class="empty" id="empty">
-      <h1>What should we look at?</h1>
-      <p>Ask about revenue, discounting or margin. Charts come back as Vega-Lite specs, rendered inline.</p>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo"><i></i></div>
+      <div class="sb-name">Lumen Analyst</div>
+      <button class="icon-btn" id="collapseBtn" title="Toggle sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="2"></rect><line x1="6.5" y1="3" x2="6.5" y2="13"></line></svg>
+      </button>
     </div>
-  </div>
-  <div class="composer">
-    <div class="composer-inner">
-      <textarea id="draft" rows="1" placeholder="Ask about the data…"></textarea>
-      <button class="send" id="send">↑</button>
+    <div class="sb-actions">
+      <button class="new-chat" id="newChatBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"></line><line x1="3" y1="8" x2="13" y2="8"></line></svg>
+        <span class="nc-label">New chat</span>
+      </button>
+      <div class="search sb-hideable">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8b8781" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.2"></circle><line x1="10.2" y1="10.2" x2="13.5" y2="13.5"></line></svg>
+        <input id="searchInput" placeholder="Search chats" autocomplete="off">
+      </div>
     </div>
-    <div class="hint">Agent runs read-only SQL and returns Vega-Lite specs. Verify figures before sharing.</div>
-  </div>
-</main>
-<script>
-const $ = (s, r = document) => r.querySelector(s);
-const thread = $("#thread"), draft = $("#draft"), sendBtn = $("#send");
-const SESSION = "s-" + Math.random().toString(36).slice(2);
-let busy = false;
+    <div class="sb-list sb-hideable" id="chatList"></div>
+    <div class="sb-foot sb-hideable">Stored in this browser</div>
+  </aside>
 
-function el(tag, cls, html) {
+  <main>
+    <header>
+      <div class="title" id="headerTitle">New chat</div>
+      <div class="badge"><span></span>warehouse · read only</div>
+      <div class="grow"></div>
+      <div class="engine">echarts v5</div>
+    </header>
+    <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
+    <div class="composer">
+      <div class="composer-inner">
+        <textarea id="draft" rows="1" placeholder="Ask about the data…"></textarea>
+        <button class="send" id="send">↑</button>
+      </div>
+      <div class="hint">Agent runs read-only SQL and returns ECharts options. Verify figures before sharing.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+echarts.registerTheme("lumen", {
+  color: ["#3a53c9", "#2f8f7a", "#c9772f", "#8a5cd0", "#c94f6d", "#3f8fc9"],
+  backgroundColor: "transparent",
+  textStyle: { fontFamily: "'IBM Plex Sans', system-ui, sans-serif", color: "#1c1b19" },
+  title: { textStyle: { color: "#1c1b19", fontWeight: 600, fontSize: 13 } },
+  grid: { left: 8, right: 22, top: 34, bottom: 8, containLabel: true },
+  categoryAxis: {
+    axisLine: { lineStyle: { color: "#d9d4cc" } },
+    axisTick: { show: false },
+    axisLabel: { color: "#7b776f" },
+    splitLine: { show: false },
+  },
+  valueAxis: {
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: "#7b776f" },
+    nameTextStyle: { color: "#a09b93", align: "left", padding: [0, 0, 4, 0] },
+    splitLine: { lineStyle: { color: "rgba(0,0,0,.06)" } },
+  },
+  line: { smooth: true, symbolSize: 7, lineStyle: { width: 2 } },
+  bar: { itemStyle: { borderRadius: [4, 4, 0, 0] } },
+  tooltip: {
+    backgroundColor: "#fff",
+    borderColor: "rgba(0,0,0,.1)",
+    borderWidth: 1,
+    padding: [7, 10],
+    textStyle: { color: "#1c1b19", fontSize: 12 },
+  },
+  legend: { textStyle: { color: "#7b776f" }, icon: "roundRect", itemWidth: 10, itemHeight: 10 },
+});
+
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (html != null) n.innerHTML = html;
   return n;
-}
+};
+const esc = s => String(s).replace(/</g, "&lt;");
+const uid = p => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-function addUser(text) {
-  $("#empty")?.remove();
-  const n = el("div", "user");
-  n.textContent = text;
-  thread.appendChild(n);
-}
+const thread = $("#thread"), threadInner = $("#threadInner");
+const draft = $("#draft"), sendBtn = $("#send"), sidebar = $("#sidebar");
+const chatList = $("#chatList"), headerTitle = $("#headerTitle"), searchInput = $("#searchInput");
 
-function newAgentBlock() {
-  const wrap = el("div", "agent");
-  wrap.appendChild(el("div", "avatar"));
-  const body = el("div", "agent-body");
-  wrap.appendChild(body);
-  thread.appendChild(wrap);
+/* ---------- store (localStorage) ---------- */
+const STORAGE_KEY = "lumen.v1";
+const PROMPTS = ["Revenue by region", "Monthly revenue trend", "Discount vs margin"];
 
-  const trace = el("details", "trace");
-  trace.appendChild(el("summary", null, "steps"));
-  const steps = el("div", "steps");
-  trace.appendChild(steps);
-  let hasSteps = false;
+const store = {
+  chats: [],
+  activeId: null,
+  collapsed: false,
+  load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      this.chats = Array.isArray(raw.chats) ? raw.chats : [];
+      this.activeId = raw.activeId || null;
+      this.collapsed = !!raw.collapsed;
+    } catch (e) { this.chats = []; this.activeId = null; }
+    if (!this.chats.length) this.newChat(false);
+    if (!this.chats.find(c => c.id === this.activeId)) this.activeId = this.chats[0].id;
+  },
+  save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        chats: this.chats, activeId: this.activeId, collapsed: this.collapsed,
+      }));
+    } catch (e) { /* private mode / quota — run without persistence */ }
+  },
+  active() { return this.chats.find(c => c.id === this.activeId); },
+  newChat(save = true) {
+    const c = { id: uid("c"), title: "New chat", createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+    this.chats.unshift(c);
+    this.activeId = c.id;
+    if (save) this.save();
+    return c;
+  },
+  remove(id) {
+    const idx = this.chats.findIndex(c => c.id === id);
+    if (idx < 0) return null;
+    const [gone] = this.chats.splice(idx, 1);
+    if (!this.chats.length) this.newChat(false);
+    if (this.activeId === id) this.activeId = this.chats[Math.min(idx, this.chats.length - 1)].id;
+    this.save();
+    return { chat: gone, idx };
+  },
+};
 
-  const thinking = el("div", "thinking", "<i></i><i></i><i></i><span></span>");
-  body.appendChild(thinking);
-
-  const api = {
-    thinking(label) { thinking.querySelector("span").textContent = label; },
-    step(label, detail) {
-      if (!hasSteps) { body.insertBefore(trace, thinking); hasSteps = true; }
-      const s = el("div");
-      s.appendChild(el("div", "step-label", label));
-      if (detail) s.appendChild(el("div", "step-detail", detail.replace(/</g, "&lt;")));
-      steps.appendChild(s);
-    },
-    text(t) {
-      thinking.remove();
-      body.appendChild(el("div", "para", t.replace(/</g, "&lt;")));
-    },
-    error(msg) {
-      thinking.remove();
-      const e = el("div", "card");
-      const b = el("div", "err");
-      b.appendChild(el("div", "err-title", "Spec failed to render"));
-      b.appendChild(el("div", "err-text", msg.replace(/</g, "&lt;")));
-      e.appendChild(b);
-      body.appendChild(e);
-    },
-    chart(payload) {
-      thinking.remove();
-      body.appendChild(buildChartCard(payload));
-    },
-    done() { thinking.remove(); },
-  };
-  return api;
+/* ---------- chart card ---------- */
+function disposeThreadCharts() {
+  threadInner.querySelectorAll(".card-body > div").forEach(d => {
+    const inst = echarts.getInstanceByDom(d);
+    if (inst) inst.dispose();
+  });
 }
 
 function buildChartCard({ title, meta, spec, data }) {
   const card = el("div", "card");
   const head = el("div", "card-head");
-  const titleEl = el("div", "card-title"); titleEl.textContent = title;
-  head.appendChild(titleEl);
-  const metaEl = el("div", "card-meta"); metaEl.textContent = meta;
-  head.appendChild(metaEl);
+  const titleEl = el("div", "card-title"); titleEl.textContent = title; head.appendChild(titleEl);
+  const metaEl = el("div", "card-meta"); metaEl.textContent = meta; head.appendChild(metaEl);
   const tabs = el("div", "tabs");
   ["Chart", "Spec", "Data"].forEach((name, i) => {
     const b = el("button", i === 0 ? "on" : null, name);
@@ -168,16 +276,30 @@ function buildChartCard({ title, meta, spec, data }) {
   card.appendChild(bodyEl);
 
   function show(name) {
+    if (bodyEl._ro) { bodyEl._ro.disconnect(); bodyEl._ro = null; }
+    if (bodyEl._chart) { bodyEl._chart.dispose(); bodyEl._chart = null; }
     bodyEl.innerHTML = "";
     if (name === "Chart") {
       const host = el("div");
+      host.style.width = "100%";
+      host.style.height = "320px";
       bodyEl.appendChild(host);
-      vegaEmbed(host, spec, { actions: false, renderer: "svg" })
-        .catch(err => { bodyEl.innerHTML =
-          '<div class="err"><div class="err-title">Render error</div><div class="err-text">'
-          + String(err).replace(/</g, "&lt;") + "</div></div>"; });
+      requestAnimationFrame(() => {
+        try {
+          const inst = echarts.init(host, "lumen", { renderer: "svg" });
+          inst.setOption(spec);
+          const ro = new ResizeObserver(() => inst.resize());
+          ro.observe(host);
+          bodyEl._chart = inst;
+          bodyEl._ro = ro;
+        } catch (err) {
+          bodyEl.innerHTML =
+            '<div class="err"><div class="err-title">Render error</div><div class="err-text">'
+            + esc(err) + "</div></div>";
+        }
+      });
     } else if (name === "Spec") {
-      bodyEl.appendChild(el("div", "spec-view", JSON.stringify(spec, null, 2).replace(/</g, "&lt;")));
+      bodyEl.appendChild(el("div", "spec-view", esc(JSON.stringify(spec, null, 2))));
     } else {
       const t = el("table");
       const tr = el("tr");
@@ -185,25 +307,263 @@ function buildChartCard({ title, meta, spec, data }) {
       t.appendChild(tr);
       data.rows.slice(0, 50).forEach(row => {
         const r = el("tr");
-        row.forEach(v => r.appendChild(el("td", null, String(v).replace(/</g, "&lt;"))));
+        row.forEach(v => r.appendChild(el("td", null, esc(v))));
         t.appendChild(r);
       });
-      const wrap = el("div");
-      wrap.style.overflow = "auto";
-      wrap.appendChild(t);
+      const wrap = el("div"); wrap.style.overflow = "auto"; wrap.appendChild(t);
       bodyEl.appendChild(wrap);
     }
   }
-  show("Chart");
+  // Render once attached so the chart can measure its container.
+  requestAnimationFrame(() => show("Chart"));
   return card;
+}
+
+/* ---------- thread rendering (from the model) ---------- */
+function renderAgentMessage(msg) {
+  const wrap = el("div", "agent");
+  wrap.appendChild(el("div", "avatar"));
+  const body = el("div", "agent-body");
+  wrap.appendChild(body);
+
+  if (msg.steps && msg.steps.length) {
+    const trace = el("details", "trace");
+    trace.appendChild(el("summary", null, msg.steps.length === 1 ? "1 step" : msg.steps.length + " steps"));
+    const steps = el("div", "steps");
+    msg.steps.forEach(s => {
+      const d = el("div");
+      d.appendChild(el("div", "step-label", esc(s.label)));
+      if (s.detail) d.appendChild(el("div", "step-detail", esc(s.detail)));
+      steps.appendChild(d);
+    });
+    trace.appendChild(steps);
+    body.appendChild(trace);
+  }
+  (msg.paras || []).forEach(t => body.appendChild(el("div", "para", esc(t))));
+  if (msg.chart) body.appendChild(buildChartCard(msg.chart));
+  if (msg.error) {
+    const c = el("div", "card");
+    const b = el("div", "err");
+    b.appendChild(el("div", "err-title", "Spec failed to render"));
+    b.appendChild(el("div", "err-text", esc(msg.error)));
+    c.appendChild(b);
+    body.appendChild(c);
+  }
+  return wrap;
+}
+
+function renderThread() {
+  disposeThreadCharts();
+  threadInner.innerHTML = "";
+  const chat = store.active();
+  headerTitle.textContent = chat.title;
+
+  if (!chat.messages.length) {
+    const e = el("div", "empty");
+    e.appendChild(el("h1", null, "What should we look at?"));
+    e.appendChild(el("p", null, "Ask about revenue, discounting or margin. Charts come back as ECharts options, rendered inline."));
+    const chips = el("div", "chips");
+    PROMPTS.forEach(p => {
+      const b = el("button", null, esc(p));
+      b.onclick = () => { draft.value = p; send(); };
+      chips.appendChild(b);
+    });
+    e.appendChild(chips);
+    threadInner.appendChild(e);
+    return;
+  }
+  chat.messages.forEach(m => {
+    if (m.role === "user") {
+      const n = el("div", "user"); n.textContent = m.text;
+      threadInner.appendChild(n);
+    } else {
+      threadInner.appendChild(renderAgentMessage(m));
+    }
+  });
+  thread.scrollTop = thread.scrollHeight;
+}
+
+/* ---------- sidebar rendering ---------- */
+let openMenuId = null;
+let renamingId = null;
+
+function renderSidebar() {
+  sidebar.classList.toggle("collapsed", store.collapsed);
+  const q = searchInput.value.trim().toLowerCase();
+  chatList.innerHTML = "";
+  chatList.appendChild(el("div", "sb-section", "Recent"));
+
+  const rows = store.chats.filter(c => !q || c.title.toLowerCase().includes(q));
+  if (!rows.length) {
+    chatList.appendChild(el("div", "sb-section", q ? "No matches" : "No chats"));
+  }
+  rows.forEach(c => {
+    const row = el("div", "chat-row" + (c.id === store.activeId ? " active" : ""));
+
+    if (renamingId === c.id) {
+      const input = el("input", "rename");
+      input.value = c.title;
+      const commit = () => {
+        const v = input.value.trim();
+        if (v) { c.title = v; c.updatedAt = Date.now(); store.save(); }
+        renamingId = null;
+        renderSidebar(); renderThread();
+      };
+      input.onkeydown = e => {
+        if (e.key === "Enter") commit();
+        else if (e.key === "Escape") { renamingId = null; renderSidebar(); }
+      };
+      input.onblur = commit;
+      row.appendChild(input);
+      chatList.appendChild(row);
+      setTimeout(() => { input.focus(); input.select(); }, 0);
+      return;
+    }
+
+    const sel = el("button", "sel"); sel.textContent = c.title;
+    sel.onclick = () => {
+      if (store.activeId === c.id) return;
+      store.activeId = c.id; store.save();
+      openMenuId = null;
+      renderSidebar(); renderThread();
+    };
+    row.appendChild(sel);
+
+    const menuBtn = el("button", "menu-btn" + (openMenuId === c.id ? " open" : ""),
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="4" cy="8" r="1.35"></circle><circle cx="8" cy="8" r="1.35"></circle><circle cx="12" cy="8" r="1.35"></circle></svg>');
+    menuBtn.onclick = e => {
+      e.stopPropagation();
+      openMenuId = openMenuId === c.id ? null : c.id;
+      renderSidebar();
+    };
+    row.appendChild(menuBtn);
+
+    if (openMenuId === c.id) {
+      const pop = el("div", "menu-pop");
+      const rename = el("button", null, "Rename");
+      rename.onclick = e => { e.stopPropagation(); openMenuId = null; renamingId = c.id; renderSidebar(); };
+      const del = el("button", "danger", "Delete chat");
+      del.onclick = e => { e.stopPropagation(); openMenuId = null; renderSidebar(); askDelete(c); };
+      pop.appendChild(rename); pop.appendChild(del);
+      row.appendChild(pop);
+    }
+    chatList.appendChild(row);
+  });
+}
+
+document.addEventListener("click", e => {
+  if (openMenuId && !e.target.closest(".chat-row")) { openMenuId = null; renderSidebar(); }
+});
+
+/* ---------- delete confirm + undo toast ---------- */
+let toastTimer = null;
+
+function askDelete(chat) {
+  const overlay = el("div", "overlay");
+  const dialog = el("div", "dialog");
+  dialog.appendChild(el("h3", null, "Delete chat?"));
+  dialog.appendChild(el("p", null, esc("“" + chat.title + "” and its charts will be removed. This can’t be undone.")));
+  const row = el("div", "row");
+  const cancel = el("button", "cancel", "Cancel");
+  cancel.onclick = () => overlay.remove();
+  const confirm = el("button", "confirm", "Delete");
+  confirm.onclick = () => {
+    overlay.remove();
+    const trash = store.remove(chat.id);
+    renderSidebar(); renderThread();
+    if (trash) showUndo(trash);
+  };
+  row.appendChild(cancel); row.appendChild(confirm);
+  dialog.appendChild(row);
+  overlay.appendChild(dialog);
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function showUndo(trash) {
+  clearTimeout(toastTimer);
+  $(".toast")?.remove();
+  const t = el("div", "toast");
+  t.appendChild(el("span", null, "Chat deleted"));
+  const undo = el("button", null, "Undo");
+  undo.onclick = () => {
+    clearTimeout(toastTimer);
+    t.remove();
+    store.chats.splice(Math.min(trash.idx, store.chats.length), 0, trash.chat);
+    store.activeId = trash.chat.id;
+    store.save();
+    renderSidebar(); renderThread();
+  };
+  t.appendChild(undo);
+  document.body.appendChild(t);
+  toastTimer = setTimeout(() => t.remove(), 5000);
+}
+
+/* ---------- streaming a turn ---------- */
+let busy = false;
+
+function liveAgentBlock() {
+  const wrap = el("div", "agent");
+  wrap.appendChild(el("div", "avatar"));
+  const body = el("div", "agent-body");
+  wrap.appendChild(body);
+  threadInner.appendChild(wrap);
+
+  const trace = el("details", "trace");
+  trace.appendChild(el("summary", null, "steps"));
+  const stepsEl = el("div", "steps");
+  trace.appendChild(stepsEl);
+  let hasSteps = false;
+
+  const thinking = el("div", "thinking", "<i></i><i></i><i></i><span></span>");
+  body.appendChild(thinking);
+
+  return {
+    thinking(label) { thinking.querySelector("span").textContent = label; },
+    step(label, detail) {
+      if (!hasSteps) { body.insertBefore(trace, thinking); hasSteps = true; }
+      const s = el("div");
+      s.appendChild(el("div", "step-label", esc(label)));
+      if (detail) s.appendChild(el("div", "step-detail", esc(detail)));
+      stepsEl.appendChild(s);
+      trace.querySelector("summary").textContent =
+        stepsEl.children.length === 1 ? "1 step" : stepsEl.children.length + " steps";
+    },
+    text(t) { thinking.remove(); body.appendChild(el("div", "para", esc(t))); },
+    error(msg) {
+      thinking.remove();
+      const c = el("div", "card");
+      const b = el("div", "err");
+      b.appendChild(el("div", "err-title", "Spec failed to render"));
+      b.appendChild(el("div", "err-text", esc(msg)));
+      c.appendChild(b);
+      body.appendChild(c);
+    },
+    chart(payload) { thinking.remove(); body.appendChild(buildChartCard(payload)); },
+    done() { thinking.remove(); },
+  };
 }
 
 async function send() {
   const text = draft.value.trim();
   if (!text || busy) return;
   busy = true; sendBtn.disabled = true; draft.value = "";
-  addUser(text);
-  const agent = newAgentBlock();
+
+  const chat = store.active();
+  chat.messages.push({ role: "user", text });
+  if (chat.title === "New chat") chat.title = text.length > 38 ? text.slice(0, 38) + "…" : text;
+  const aMsg = { role: "agent", steps: [], paras: [], chart: null, error: null, time: null };
+  chat.messages.push(aMsg);
+  chat.updatedAt = Date.now();
+  store.save();
+
+  $(".empty")?.remove();
+  const userNode = el("div", "user"); userNode.textContent = text;
+  threadInner.appendChild(userNode);
+  headerTitle.textContent = chat.title;
+  renderSidebar();
+
+  const agent = liveAgentBlock();
   agent.thinking("Working…");
   thread.scrollTop = thread.scrollHeight;
 
@@ -212,13 +572,18 @@ async function send() {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ session_id: SESSION, message: text }),
+      body: JSON.stringify({ session_id: chat.id, message: text }),
     });
   } catch (e) {
-    agent.error("Network error: " + e); busy = false; sendBtn.disabled = false; return;
+    agent.error("Network error: " + e);
+    aMsg.error = "Network error: " + e; store.save();
+    busy = false; sendBtn.disabled = false; return;
   }
-
-  if (!res.ok) { agent.error("Server error " + res.status); busy = false; sendBtn.disabled = false; return; }
+  if (!res.ok) {
+    agent.error("Server error " + res.status);
+    aMsg.error = "Server error " + res.status; store.save();
+    busy = false; sendBtn.disabled = false; return;
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -230,27 +595,47 @@ async function send() {
     const chunks = buf.split("\n\n");
     buf = chunks.pop();
     for (const chunk of chunks) {
-      const line = chunk.split("\n");
-      const ev = (line.find(l => l.startsWith("event: ")) || "").slice(7).trim();
-      const dataLine = line.find(l => l.startsWith("data: "));
+      const lines = chunk.split("\n");
+      const ev = (lines.find(l => l.startsWith("event: ")) || "").slice(7).trim();
+      const dataLine = lines.find(l => l.startsWith("data: "));
       if (!ev || !dataLine) continue;
       const d = JSON.parse(dataLine.slice(6));
       if (ev === "thinking") agent.thinking(d.label);
-      else if (ev === "step") agent.step(d.label, d.detail);
-      else if (ev === "text") agent.text(d.text);
-      else if (ev === "chart") agent.chart(d);
-      else if (ev === "error") agent.error(d.message);
-      else if (ev === "done") agent.done();
+      else if (ev === "step") { agent.step(d.label, d.detail); aMsg.steps.push({ label: d.label, detail: d.detail }); }
+      else if (ev === "text") { agent.text(d.text); aMsg.paras.push(d.text); }
+      else if (ev === "chart") { agent.chart(d); aMsg.chart = { title: d.title, meta: d.meta, spec: d.spec, data: d.data }; }
+      else if (ev === "error") { agent.error(d.message); aMsg.error = d.message; }
+      else if (ev === "done") { agent.done(); aMsg.time = d.seconds; }
       thread.scrollTop = thread.scrollHeight;
     }
   }
+  chat.updatedAt = Date.now();
+  store.save();
   busy = false; sendBtn.disabled = false;
 }
 
+/* ---------- wiring ---------- */
+$("#newChatBtn").onclick = () => {
+  const chat = store.active();
+  if (chat.messages.length === 0) { draft.focus(); return; }
+  store.newChat();
+  searchInput.value = "";
+  renderSidebar(); renderThread();
+  draft.focus();
+};
+$("#collapseBtn").onclick = () => {
+  store.collapsed = !store.collapsed; store.save();
+  renderSidebar();
+};
+searchInput.addEventListener("input", renderSidebar);
 sendBtn.onclick = send;
 draft.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
+
+store.load();
+renderSidebar();
+renderThread();
 </script>
 </body>
 </html>
