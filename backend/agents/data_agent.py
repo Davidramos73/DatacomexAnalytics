@@ -65,15 +65,17 @@ def answer_data_question(question: str, sink: llm.Sink, *, con=None) -> DataResu
     owns_con = con is None
     con = con if con is not None else db.connect()
     try:
+        schema_ctx = schema.schema_context(con)
+
         def _get_schema() -> str:
-            return schema.schema_context(con)
+            return schema_ctx
 
         def _run_sql(sql: str) -> str:
             return json.dumps(db.run_sql(con, sql))
 
         result = llm.run_agent(
             model=DATA_AGENT_MODEL,
-            system=_SYSTEM.format(schema=schema.schema_context(con)),
+            system=_SYSTEM.format(schema=schema_ctx),
             messages=[{"role": "user", "content": question}],
             tools=_TOOLS,
             tool_impls={"get_schema": _get_schema, "run_sql": _run_sql},

@@ -147,8 +147,10 @@ function newAgentBlock() {
 function buildChartCard({ title, meta, spec, data }) {
   const card = el("div", "card");
   const head = el("div", "card-head");
-  head.appendChild(el("div", "card-title", title));
-  head.appendChild(el("div", "card-meta", meta));
+  const titleEl = el("div", "card-title"); titleEl.textContent = title;
+  head.appendChild(titleEl);
+  const metaEl = el("div", "card-meta"); metaEl.textContent = meta;
+  head.appendChild(metaEl);
   const tabs = el("div", "tabs");
   ["Chart", "Spec", "Data"].forEach((name, i) => {
     const b = el("button", i === 0 ? "on" : null, name);
@@ -179,7 +181,7 @@ function buildChartCard({ title, meta, spec, data }) {
     } else {
       const t = el("table");
       const tr = el("tr");
-      data.columns.forEach(c => tr.appendChild(el("th", null, c)));
+      data.columns.forEach(c => { const th = el("th"); th.textContent = c; tr.appendChild(th); });
       t.appendChild(tr);
       data.rows.slice(0, 50).forEach(row => {
         const r = el("tr");
@@ -215,6 +217,8 @@ async function send() {
   } catch (e) {
     agent.error("Network error: " + e); busy = false; sendBtn.disabled = false; return;
   }
+
+  if (!res.ok) { agent.error("Server error " + res.status); busy = false; sendBtn.disabled = false; return; }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

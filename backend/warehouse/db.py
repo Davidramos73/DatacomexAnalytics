@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import datetime
+import decimal
 import re
+import threading
+import uuid
 from pathlib import Path
 
 import duckdb
@@ -9,7 +13,9 @@ from backend.config import SQL_MAX_ROWS, SQL_TIMEOUT_S, WAREHOUSE_PATH
 
 _FORBIDDEN = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|DETACH|COPY|PRAGMA|"
-    r"INSTALL|LOAD|SET|CALL|EXPORT|IMPORT)\b",
+    r"INSTALL|LOAD|SET|CALL|EXPORT|IMPORT|"
+    r"read_text|read_blob|read_csv|read_csv_auto|read_json|read_json_auto|"
+    r"read_ndjson|read_parquet|parquet_scan|glob|sniff_csv|read_xlsx)\b",
     re.IGNORECASE,
 )
 _COMMENT = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
@@ -19,13 +25,36 @@ class UnsafeSQLError(ValueError):
     """Raised when a SQL string is not a safe read-only single SELECT."""
 
 
+class QueryTimeoutError(UnsafeSQLError):
+    """Raised when a query exceeds its timeout and is interrupted."""
+
+
+def _jsonable(v):
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    if isinstance(v, (datetime.date, datetime.datetime, datetime.time)):
+        return v.isoformat()
+    if isinstance(v, decimal.Decimal):
+        return float(v)
+    if isinstance(v, (bytes, bytearray)):
+        return bytes(v).decode("utf-8", "replace")
+    if isinstance(v, uuid.UUID):
+        return str(v)
+    return str(v)
+
+
 def connect(path: Path | None = None) -> duckdb.DuckDBPyConnection:
     path = Path(path) if path is not None else WAREHOUSE_PATH
     if not path.exists():
         raise FileNotFoundError(
             f"Warehouse not found at {path}. Run: python -m backend.warehouse.seed"
         )
-    return duckdb.connect(str(path), read_only=True)
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        con.execute("SET enable_external_access=false")
+    except duckdb.Error:
+        pass  # older DuckDB: option unavailable
+    return con
 
 
 def _sanitize(sql: str) -> str:
@@ -65,14 +94,28 @@ def run_sql(
         effective = f"SELECT * FROM (\n{clean}\n) AS _q LIMIT {max_rows + 1}"
         cap = max_rows
 
-    try:
-        con.execute(f"SET statement_timeout = '{int(timeout_s * 1000)}ms'")
-    except duckdb.Error:
-        pass  # older DuckDB: no statement_timeout; rely on data size
+    timed_out = threading.Event()
 
-    rel = con.execute(effective)
-    columns = [d[0] for d in rel.description]
-    rows = [list(r) for r in rel.fetchall()]
+    def _interrupt():
+        timed_out.set()
+        try:
+            con.interrupt()
+        except Exception:
+            pass
+
+    watchdog = threading.Timer(timeout_s, _interrupt)
+    watchdog.start()
+    try:
+        rel = con.execute(effective)
+        columns = [d[0] for d in rel.description]
+        rows = [[_jsonable(c) for c in r] for r in rel.fetchall()]
+    except duckdb.Error as e:
+        if timed_out.is_set():
+            raise QueryTimeoutError(f"query exceeded {timeout_s}s timeout") from e
+        raise
+    finally:
+        watchdog.cancel()
+
     truncated = len(rows) > cap
     if truncated:
         rows = rows[:cap]

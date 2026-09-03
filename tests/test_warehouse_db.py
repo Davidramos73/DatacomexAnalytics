@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from backend.warehouse import db, seed
 
@@ -46,3 +48,31 @@ def test_explicit_limit_is_respected(con):
     out = db.run_sql(con, "SELECT * FROM fct_orders LIMIT 3", max_rows=5)
     assert out["row_count"] == 3
     assert out["truncated"] is False
+
+
+def test_non_json_values_are_coerced(con):
+    out = db.run_sql(
+        con, "SELECT CAST('2026-03-01' AS DATE) AS d, CAST(1.5 AS DECIMAL(4,2)) AS n"
+    )
+    json.dumps(out)  # must not raise
+    d, n = out["rows"][0]
+    assert isinstance(d, str) and d == "2026-03-01"
+    assert isinstance(n, float) and n == 1.5
+
+
+@pytest.mark.parametrize("bad", [
+    "SELECT * FROM read_text('/etc/hostname')",
+    "SELECT * FROM glob('/etc/*')",
+])
+def test_rejects_file_access(con, bad):
+    with pytest.raises(db.UnsafeSQLError):
+        db.run_sql(con, bad)
+
+
+def test_query_timeout(con):
+    with pytest.raises(db.UnsafeSQLError):
+        db.run_sql(
+            con,
+            "SELECT count(*) FROM range(100000000000) t1, range(100000) t2",
+            timeout_s=1,
+        )
