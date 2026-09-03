@@ -6,6 +6,13 @@
 <title>Lumen Analyst</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/macarons.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/vintage.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/westeros.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/roma.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/shine.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/walden.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/chalk.js"></script>
 <style>
   html,body{margin:0;padding:0;height:100%}
   body{background:#faf9f8;color:#1c1b19;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -59,6 +66,7 @@
   .badge span{width:5px;height:5px;border-radius:50%;background:#2f8f7a}
   .grow{flex:1}
   .engine{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b8781}
+  .theme-sel{font-family:inherit;font-size:11.5px;color:#4a4740;background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:4px 6px;cursor:pointer;outline:none}
   .thread{flex:1;overflow-y:auto;overflow-x:hidden}
   .thread-inner{max-width:760px;margin:0 auto;padding:26px 24px 40px;display:flex;flex-direction:column;gap:26px}
   .user{align-self:flex-end;max-width:78%;padding:10px 14px;background:#ebe8e3;border-radius:14px 14px 4px 14px;font-size:14px;line-height:1.55}
@@ -143,6 +151,7 @@
       <div class="title" id="headerTitle">New chat</div>
       <div class="badge"><span></span>warehouse · read only</div>
       <div class="grow"></div>
+      <select class="theme-sel" id="themeSel" title="Chart theme"></select>
       <div class="engine">echarts v5</div>
     </header>
     <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
@@ -157,6 +166,7 @@
 </div>
 
 <script>
+/* "lumen" — a custom theme tuned to this app's paper / indigo palette. */
 echarts.registerTheme("lumen", {
   color: ["#3a53c9", "#2f8f7a", "#c9772f", "#8a5cd0", "#c94f6d", "#3f8fc9"],
   backgroundColor: "transparent",
@@ -188,6 +198,15 @@ echarts.registerTheme("lumen", {
   legend: { textStyle: { color: "#7b776f" }, icon: "roundRect", itemWidth: 10, itemHeight: 10 },
 });
 
+// [value, label]; "default" -> ECharts built-in light (no registered theme).
+const THEMES = [
+  ["lumen", "Lumen"], ["default", "ECharts light"], ["macarons", "Macarons"],
+  ["vintage", "Vintage"], ["westeros", "Westeros"], ["roma", "Roma"],
+  ["shine", "Shine"], ["walden", "Walden"], ["chalk", "Chalk (dark)"], ["dark", "Dark"],
+];
+const DEFAULT_THEME = "lumen";
+let chartTheme = DEFAULT_THEME;
+
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -210,12 +229,14 @@ const store = {
   chats: [],
   activeId: null,
   collapsed: false,
+  theme: DEFAULT_THEME,
   load() {
     try {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       this.chats = Array.isArray(raw.chats) ? raw.chats : [];
       this.activeId = raw.activeId || null;
       this.collapsed = !!raw.collapsed;
+      if (THEMES.some(t => t[0] === raw.theme)) this.theme = raw.theme;
     } catch (e) { this.chats = []; this.activeId = null; }
     if (!this.chats.length) this.newChat(false);
     if (!this.chats.find(c => c.id === this.activeId)) this.activeId = this.chats[0].id;
@@ -223,7 +244,7 @@ const store = {
   save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        chats: this.chats, activeId: this.activeId, collapsed: this.collapsed,
+        chats: this.chats, activeId: this.activeId, collapsed: this.collapsed, theme: this.theme,
       }));
     } catch (e) { /* private mode / quota — run without persistence */ }
   },
@@ -286,8 +307,9 @@ function buildChartCard({ title, meta, spec, data }) {
       bodyEl.appendChild(host);
       requestAnimationFrame(() => {
         try {
-          const inst = echarts.init(host, "lumen", { renderer: "svg" });
-          inst.setOption(spec);
+          const inst = echarts.init(host, chartTheme === "default" ? null : chartTheme, { renderer: "svg" });
+          // Every theme sits on the white card — ignore a theme's own page colour.
+          inst.setOption(Object.assign({ backgroundColor: "transparent" }, spec));
           const ro = new ResizeObserver(() => inst.resize());
           ro.observe(host);
           bodyEl._chart = inst;
@@ -633,7 +655,22 @@ draft.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
 
+const themeSel = $("#themeSel");
+THEMES.forEach(([value, label]) => {
+  const o = document.createElement("option");
+  o.value = value; o.textContent = label;
+  themeSel.appendChild(o);
+});
+themeSel.addEventListener("change", () => {
+  store.theme = themeSel.value;
+  chartTheme = store.theme;
+  store.save();
+  renderThread();
+});
+
 store.load();
+chartTheme = store.theme;
+themeSel.value = store.theme;
 renderSidebar();
 renderThread();
 </script>
