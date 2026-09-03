@@ -83,6 +83,7 @@ def build(path: Path | None = None) -> None:
     rng = random.Random(RANDOM_SEED)
     con = duckdb.connect(str(path))
     try:
+        con.execute("BEGIN TRANSACTION")
         con.execute(
             "CREATE TABLE dim_region (region VARCHAR, macro_area VARCHAR)"
         )
@@ -115,6 +116,7 @@ def build(path: Path | None = None) -> None:
             "INSERT INTO mart_account_health VALUES (?, ?, ?, ?)",
             _account_health(rng),
         )
+        con.execute("COMMIT")
     finally:
         con.close()
 
