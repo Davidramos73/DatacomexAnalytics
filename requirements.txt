@@ -1,4 +1,5 @@
 anthropic>=0.116
+openai>=1.40
 fastapi>=0.110
 uvicorn[standard]>=0.27
 duckdb>=0.10

@@ -6,7 +6,7 @@ import time
 from backend import events
 from backend.agents import llm
 from backend.agents.data_agent import answer_data_question
-from backend.config import LLM_MODEL, MAX_TOKENS
+from backend.config import LLM_MODEL
 
 _SYSTEM = """\
 You are an analytics orchestrator. You have a data analyst subordinate you reach
@@ -159,9 +159,8 @@ def run(
     dataset = ok_datasets[-1]
     records = rows_to_records(dataset.columns, dataset.rows)
 
-    close_out = llm.get_client().messages.create(
+    payload = llm.structured_json(
         model=LLM_MODEL,
-        max_tokens=MAX_TOKENS,
         system=_SYSTEM,
         messages=agent.messages
         + [
@@ -173,10 +172,9 @@ def run(
             }
         ],
         tools=[_QUERY_DATA_TOOL],
-        output_config={"format": {"type": "json_schema", "schema": _RESPONSE_SCHEMA}},
+        schema=_RESPONSE_SCHEMA,
+        schema_name="chart_response",
     )
-    text = next(b.text for b in close_out.content if b.type == "text")
-    payload = json.loads(text)
     if isinstance(payload.get("echarts_option"), str):
         payload["echarts_option"] = json.loads(payload["echarts_option"])
 

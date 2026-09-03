@@ -24,11 +24,25 @@ uvicorn backend.app:app --port 8000
 # open http://localhost:8000
 ```
 
+## Provider
+
+Default provider is Anthropic (`claude-opus-5`). To use OpenRouter's
+OpenAI-compatible API instead:
+
+```bash
+export LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY=sk-or-...
+# default model becomes deepseek/deepseek-v4-pro-0813; override with LLM_MODEL
+```
+
+The agentic loop, tool schemas and the JSON close-out are adapted per provider
+in `backend/agents/llm.py`.
+
 ## Cost
 
-Every message runs at least two Claude calls (orchestrator loop + close-out) plus the
-data agent's loop. Default model is `claude-opus-5`. Set `LLM_MODEL=claude-sonnet-5`
-(and/or `DATA_AGENT_MODEL`) to reduce cost.
+Every message runs at least two model calls (orchestrator loop + close-out) plus
+the data agent's loop. Set `LLM_MODEL` (and/or `DATA_AGENT_MODEL`) to a cheaper
+model to reduce cost.
 
 ## Tests
 
