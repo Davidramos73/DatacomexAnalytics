@@ -151,10 +151,31 @@ def test_structured_json_openai(monkeypatch, as_openrouter):
             {"role": "user", "content": "q"},
         ],
         tools=[{"name": "f"}],
-        schema={"type": "object"},
+        schema={
+            "type": "object",
+            "properties": {
+                "answer": {}, "chart_title": {}, "chart_meta": {}, "echarts_option": {}
+            },
+        },
         schema_name="chart_response",
     )
     assert out["chart_title"] == "t"
-    rf = fake.calls[0]["response_format"]
-    assert rf["type"] == "json_schema"
-    assert rf["json_schema"]["name"] == "chart_response"
+    assert fake.calls[0]["response_format"] == {"type": "json_object"}
+    # the schema's keys are surfaced to the model as an instruction
+    assert "echarts_option" in fake.calls[0]["messages"][-1]["content"]
+    assert "tools" not in fake.calls[0]
+
+
+def test_structured_json_openai_retries_on_bad_json(monkeypatch, as_openrouter):
+    fake = FakeOpenAI([
+        _Resp(_Message(content="not json at all")),
+        _Resp(_Message(content='{"ok": true}')),
+    ])
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    out = llm.structured_json(
+        model="m", system="s",
+        messages=[{"role": "user", "content": "q"}],
+        tools=[], schema={"type": "object", "properties": {}},
+    )
+    assert out == {"ok": True}
+    assert len(fake.calls) == 2

@@ -55,6 +55,17 @@ class AgentResult:
     hit_limit: bool
 
 
+def _loads_lenient(text: str) -> dict:
+    """json.loads, tolerating a ```json fence or prose around the object."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start == -1 or end <= start:
+            raise
+        return json.loads(text[start : end + 1])
+
+
 def to_openai_tools(tools: list[dict]) -> list[dict]:
     """Convert our Anthropic-style tool defs to OpenAI function-tool defs."""
     return [
@@ -269,21 +280,41 @@ def structured_json(
     client = get_client()
 
     if config.LLM_PROVIDER == "openrouter":
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=to_openai_tools(tools),
-            max_tokens=MAX_TOKENS,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": schema_name,
-                    "strict": True,
-                    "schema": schema,
-                },
-            },
+        # json_object (not json_schema): a Vega/ECharts option can't be strictly
+        # schematised, and nesting it as an escaped string invites truncation and
+        # escaping bugs. We steer the shape via an instruction and parse both a
+        # nested object and a stringified one. No `tools`: offering them next to
+        # a forced-JSON response makes some models emit a tool call instead.
+        keys = ", ".join(schema.get("properties", {}))
+        nudge = (
+            f"\n\nRespond with ONLY a JSON object with these keys: {keys}. "
+            "`echarts_option` must be a JSON object, not a string."
         )
-        return json.loads(response.choices[0].message.content)
+        msgs = list(messages)
+        if msgs and msgs[-1].get("role") == "user":
+            msgs[-1] = {**msgs[-1], "content": msgs[-1]["content"] + nudge}
+        else:
+            msgs.append({"role": "user", "content": nudge.strip()})
+
+        last_err: Exception | None = None
+        for _ in range(2):  # one retry — response_format is best-effort
+            choice = client.chat.completions.create(
+                model=model,
+                messages=msgs,
+                max_tokens=MAX_TOKENS,
+                response_format={"type": "json_object"},
+            ).choices[0]
+            content = choice.message.content
+            if content:
+                try:
+                    return _loads_lenient(content)
+                except json.JSONDecodeError as exc:
+                    last_err = exc
+            else:
+                last_err = RuntimeError(
+                    f"empty JSON content (finish_reason={choice.finish_reason})"
+                )
+        raise RuntimeError(f"structured close-out failed: {last_err}")
 
     response = client.messages.create(
         model=model,

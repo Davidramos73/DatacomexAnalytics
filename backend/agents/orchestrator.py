@@ -175,8 +175,22 @@ def run(
         schema=_RESPONSE_SCHEMA,
         schema_name="chart_response",
     )
+    # Some models return these as objects/numbers; the UI wants plain strings.
+    for key in ("answer", "chart_title", "chart_meta"):
+        val = payload.get(key)
+        if val is None:
+            payload[key] = ""
+        elif not isinstance(val, str):
+            payload[key] = json.dumps(val) if isinstance(val, (dict, list)) else str(val)
+
     if isinstance(payload.get("echarts_option"), str):
-        payload["echarts_option"] = json.loads(payload["echarts_option"])
+        try:
+            payload["echarts_option"] = json.loads(payload["echarts_option"])
+        except json.JSONDecodeError as exc:
+            sink(events.Text(text=payload.get("answer", "")))
+            sink(events.ErrorEvent(message=f"Invalid ECharts option: {exc}"))
+            sink(events.Done(seconds=round(time.monotonic() - started, 1)))
+            return
 
     sink(events.Step(label="chart.render", detail="echarts v5"))
     try:
