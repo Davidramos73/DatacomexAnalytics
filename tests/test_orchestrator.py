@@ -50,16 +50,22 @@ def test_rows_to_records():
     assert recs == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
 
-def test_validate_fills_data_values():
-    spec = {"$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
-            "mark": "bar", "encoding": {"x": {"field": "region"}}}
-    out = orchestrator.validate_vega_lite(spec, [{"region": "NA", "rev": 8.4}])
-    assert out["data"]["values"] == [{"region": "NA", "rev": 8.4}]
+def test_validate_binds_dataset_source():
+    option = {"series": [{"type": "bar"}], "xAxis": {"type": "category"}, "yAxis": {}}
+    out = orchestrator.validate_echarts_option(option, [{"region": "NA", "rev": 8.4}])
+    assert out["dataset"]["source"] == [{"region": "NA", "rev": 8.4}]
 
 
-def test_validate_rejects_specless():
+def test_validate_keeps_inline_dataset():
+    option = {"series": [{"type": "pie"}],
+              "dataset": {"source": [{"k": "a", "v": 1}]}}
+    out = orchestrator.validate_echarts_option(option, [{"k": "b", "v": 2}])
+    assert out["dataset"]["source"] == [{"k": "a", "v": 1}]
+
+
+def test_validate_rejects_seriesless_option():
     with pytest.raises(orchestrator.SpecError):
-        orchestrator.validate_vega_lite({"encoding": {}}, [])
+        orchestrator.validate_echarts_option({"xAxis": {}}, [])
 
 
 def test_run_emits_chart(monkeypatch):
@@ -67,11 +73,10 @@ def test_run_emits_chart(monkeypatch):
         "answer": "North America leads.",
         "chart_title": "Q3 revenue by region",
         "chart_meta": "bar · fct_orders · 2 rows",
-        "vega_lite_spec": {
-            "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
-            "mark": "bar",
-            "encoding": {"x": {"field": "region", "type": "nominal"},
-                         "y": {"field": "rev", "type": "quantitative"}},
+        "echarts_option": {
+            "xAxis": {"type": "category"},
+            "yAxis": {"type": "value"},
+            "series": [{"type": "bar", "encode": {"x": "region", "y": "rev"}}],
         },
     }
     client = _client_returning(final)
@@ -83,7 +88,7 @@ def test_run_emits_chart(monkeypatch):
     kinds = [e.type for e in seen]
     assert "text" in kinds and "chart" in kinds and "done" in kinds
     chart = next(e for e in seen if isinstance(e, events.Chart))
-    assert chart.spec["data"]["values"][0]["region"] == "NA"
+    assert chart.spec["dataset"]["source"][0]["region"] == "NA"
     assert chart.title == "Q3 revenue by region"
     # close-out call must carry tools= (history contains tool_use blocks)
     assert "tools" in type(client).calls[-1]
@@ -91,7 +96,7 @@ def test_run_emits_chart(monkeypatch):
 
 def test_run_emits_error_on_bad_spec(monkeypatch):
     final = {"answer": "x", "chart_title": "t", "chart_meta": "m",
-             "vega_lite_spec": {"encoding": {}}}
+             "echarts_option": {"xAxis": {}}}
     client = _client_returning(final)
     monkeypatch.setattr(llm, "get_client", lambda: client)
     seen = []

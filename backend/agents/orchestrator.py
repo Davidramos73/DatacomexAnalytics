@@ -14,7 +14,18 @@ via the query_data tool. Your job:
 1. Turn the user's question into one or more precise data questions and call query_data.
 2. Read the returned columns/rows.
 3. Explain the finding in 1-3 short sentences of prose.
-4. Design an appropriate Vega-Lite v5 chart for the returned data.
+4. Design an appropriate Apache ECharts v5 `option` object for the returned data.
+
+ECharts chart rules:
+- Return a plain `option` object (the argument to `chart.setOption`).
+- Leave the data unbound: do NOT put rows in `series[].data`. The rows are
+  injected as `option.dataset.source` (an array of row objects keyed by column
+  name); reference columns via each series' `encode` (e.g.
+  {"x": "month", "y": "revenue"}) or, for pie, `encode: {"itemName": "region",
+  "value": "rev"}`.
+- Allowed series `type`: bar, line, pie, scatter.
+- Include `xAxis`/`yAxis` for cartesian charts (omit for pie).
+- Do NOT set colors, fonts, or a `backgroundColor` - the UI applies a theme.
 
 Call query_data at least once before answering. Do not invent numbers.
 """
@@ -37,45 +48,40 @@ _RESPONSE_SCHEMA = {
         "answer": {"type": "string"},
         "chart_title": {"type": "string"},
         "chart_meta": {"type": "string"},
-        "vega_lite_spec": {"type": "object", "additionalProperties": True},
+        "echarts_option": {
+            "type": "string",
+            "description": "The ECharts v5 option object as a JSON-encoded string.",
+        },
     },
-    "required": ["answer", "chart_title", "chart_meta", "vega_lite_spec"],
+    "required": ["answer", "chart_title", "chart_meta", "echarts_option"],
     "additionalProperties": False,
 }
 
 
 class SpecError(ValueError):
-    """Raised when the model's Vega-Lite spec is structurally invalid."""
+    """Raised when the model's ECharts option is structurally invalid."""
 
 
 def rows_to_records(columns: list[str], rows: list[list]) -> list[dict]:
     return [dict(zip(columns, r)) for r in rows]
 
 
-def validate_vega_lite(spec: dict, rows_records: list[dict]) -> dict:
-    if not isinstance(spec, dict):
-        raise SpecError("spec is not an object")
-    schema_url = str(spec.get("$schema", ""))
-    if "vega-lite" not in schema_url:
-        raise SpecError("spec is missing a Vega-Lite $schema")
-    if "mark" not in spec and "layer" not in spec:
-        raise SpecError("spec has neither 'mark' nor 'layer'")
-    has_encoding = "encoding" in spec or any(
-        "encoding" in layer for layer in spec.get("layer", []) if isinstance(layer, dict)
-    )
-    if not has_encoding:
-        raise SpecError("spec has no 'encoding'")
+def validate_echarts_option(option: dict, rows_records: list[dict]) -> dict:
+    if not isinstance(option, dict):
+        raise SpecError("option is not an object")
+    series = option.get("series")
+    if isinstance(series, dict):
+        series = [series]
+    if not series or not isinstance(series, list):
+        raise SpecError("option has no 'series'")
 
-    spec = json.loads(json.dumps(spec))  # deep copy
-    data = spec.get("data")
-    unbound = (
-        data is None
-        or (isinstance(data, dict) and not data.get("values"))
-    )
-    if unbound:
-        spec["data"] = {"values": rows_records}
-    spec.setdefault("width", "container")
-    return spec
+    option = json.loads(json.dumps(option))  # deep copy
+    # Bind the data unless the model already inlined a dataset.
+    dataset = option.get("dataset")
+    has_source = isinstance(dataset, dict) and dataset.get("source")
+    if not has_source:
+        option["dataset"] = {"source": rows_records}
+    return option
 
 
 def run(user_message: str, sink: llm.Sink, *, data_fn=answer_data_question) -> None:
@@ -129,7 +135,7 @@ def run(user_message: str, sink: llm.Sink, *, data_fn=answer_data_question) -> N
         + [
             {
                 "role": "user",
-                "content": "Now produce your final answer and Vega-Lite v5 spec "
+                "content": "Now produce your final answer and ECharts v5 option "
                 "for this dataset (leave data unbound; it will be injected):\n"
                 + json.dumps({"columns": dataset.columns, "rows": dataset.rows[:50]}),
             }
@@ -139,13 +145,15 @@ def run(user_message: str, sink: llm.Sink, *, data_fn=answer_data_question) -> N
     )
     text = next(b.text for b in close_out.content if b.type == "text")
     payload = json.loads(text)
+    if isinstance(payload.get("echarts_option"), str):
+        payload["echarts_option"] = json.loads(payload["echarts_option"])
 
-    sink(events.Step(label="chart.render", detail="vega-lite v5"))
+    sink(events.Step(label="chart.render", detail="echarts v5"))
     try:
-        spec = validate_vega_lite(payload["vega_lite_spec"], records)
+        spec = validate_echarts_option(payload["echarts_option"], records)
     except SpecError as exc:
         sink(events.Text(text=payload.get("answer", "")))
-        sink(events.ErrorEvent(message=f"Invalid Vega-Lite spec: {exc}"))
+        sink(events.ErrorEvent(message=f"Invalid ECharts option: {exc}"))
         sink(events.Done(seconds=round(time.monotonic() - started, 1)))
         return
 

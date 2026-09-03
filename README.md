@@ -1,7 +1,7 @@
 # Agent Chat Analytics
 
 Multi-agent backend that answers natural-language questions about a small analytics
-warehouse and returns a Vega-Lite chart, rendered by a minimal web UI.
+warehouse and returns an Apache ECharts chart, rendered by a minimal web UI.
 
 - **Orchestrator agent** — turns your question into data questions, then designs a chart.
 - **Data agent** — knows the schema, writes and runs read-only SQL against DuckDB.
