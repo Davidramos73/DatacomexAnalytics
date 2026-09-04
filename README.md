@@ -55,6 +55,32 @@ Override the model with `LLM_MODEL` / `DATA_AGENT_MODEL`. The agentic loop,
 tool schemas and the JSON close-out are adapted per provider in
 `backend/agents/llm.py`.
 
+## Auth (Google login)
+
+`AUTH_ENABLED=false` (default) leaves everything open — for local dev and the
+test suite. In production:
+
+```bash
+AUTH_ENABLED=true
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+SESSION_SECRET=$(openssl rand -hex 32)
+ALLOWED_EMAILS=you@example.com,teammate@example.com
+AUTH_DB_PATH=/app/data/auth.sqlite      # put this on a persistent volume
+```
+
+Flow: `login.html` → Google returns an ID token → `POST /auth/google` verifies it
+(`google-auth`), checks `ALLOWED_EMAILS`, records the login in a SQLite
+`users` / `session_log`, and sets a signed session cookie (14 days). A gate
+middleware 401s API calls / redirects HTML for anyone without a session.
+
+**Google Cloud Console**: OAuth 2.0 Client ID (Web application) → *Authorized
+JavaScript origins* = your HTTPS domain (+ `http://localhost:8000` for dev). No
+redirect URIs, no client secret.
+
+**Dokploy**: point at this repo, build the `Dockerfile`, assign a domain (Traefik
+issues TLS). Set the env vars above and mount a volume for `AUTH_DB_PATH` so the
+user history survives redeploys.
+
 ## Cost
 
 Every message runs at least two model calls (orchestrator loop + close-out) plus

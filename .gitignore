@@ -6,3 +6,5 @@ venv/
 backend/warehouse/warehouse.duckdb
 backend/warehouse/footwear.duckdb
 .pytest_cache/
+
+backend/warehouse/auth.sqlite

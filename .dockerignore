@@ -16,3 +16,4 @@ tests
 Dockerfile
 docker-compose.yml
 backend/warehouse/*.duckdb
+backend/warehouse/auth.sqlite

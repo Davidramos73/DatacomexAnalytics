@@ -863,11 +863,35 @@ themeSel.addEventListener("change", () => {
   renderThread();
 });
 
-store.load();
-chartTheme = store.theme;
-themeSel.value = store.theme;
-renderSidebar();
-renderThread();
+function renderUser(user) {
+  const foot = $(".sb-foot");
+  foot.style.cssText = "flex:none;padding:9px 12px;border-top:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:8px;font-size:11px;color:#6b6864";
+  foot.innerHTML = "";
+  const name = el("span", null, user.name || user.email);
+  name.style.cssText = "flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+  const out = el("button", null, "Salir");
+  out.style.cssText = "border:none;background:transparent;color:#3a53c9;font-size:11px;cursor:pointer;font-family:inherit;padding:0";
+  out.onclick = async () => {
+    try { await fetch("/auth/logout", { method: "POST" }); } catch (e) {}
+    location.href = "/login.html";
+  };
+  foot.appendChild(name);
+  foot.appendChild(out);
+}
+
+(async () => {
+  try {
+    const r = await fetch("/auth/me");
+    if (!r.ok) { location.href = "/login.html"; return; }
+    renderUser(await r.json());
+  } catch (e) { location.href = "/login.html"; return; }
+
+  store.load();
+  chartTheme = store.theme;
+  themeSel.value = store.theme;
+  renderSidebar();
+  renderThread();
+})();
 </script>
 </body>
 </html>

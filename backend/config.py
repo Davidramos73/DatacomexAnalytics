@@ -38,6 +38,23 @@ SQL_TIMEOUT_S = float(os.environ.get("SQL_TIMEOUT_S", "10"))
 MAX_TOKENS = 16000
 RANDOM_SEED = 42
 
+# --- auth (Google login) ---------------------------------------------------- #
+AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+SESSION_SECRET = os.environ.get("SESSION_SECRET", "dev-insecure-secret")
+SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
+ALLOWED_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+}
+AUTH_DB_PATH = Path(
+    os.environ.get(
+        "AUTH_DB_PATH",
+        str(Path(__file__).parent / "warehouse" / "auth.sqlite"),
+    )
+)
+
 WAREHOUSE_PATH = Path(
     os.environ.get(
         "WAREHOUSE_PATH",

@@ -4,14 +4,21 @@ import queue
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 import backend.config as config
 from backend import events
 from backend.agents import orchestrator, orchestrator_footwear
+from backend.routers import auth as auth_router
 from backend.routers import reports
 
 # indirection for tests; pick the chat domain at import time
@@ -22,9 +29,49 @@ orchestrator_run = (
 )
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
+_PUBLIC = ("/login.html", "/auth/", "/favicon", "/healthz")
 
 app = FastAPI(title="Agent Chat Analytics")
+app.include_router(auth_router.router)
 app.include_router(reports.router)
+
+
+@app.middleware("http")
+async def auth_gate(request: Request, call_next):
+    if not config.AUTH_ENABLED:
+        request.state.user = {"email": "dev@localhost", "name": "Dev"}
+        return await call_next(request)
+
+    path = request.url.path
+    if path.startswith(_PUBLIC):
+        return await call_next(request)
+
+    user = request.session.get("user")
+    if not user:
+        wants_json = path.startswith("/api/") or "application/json" in request.headers.get(
+            "accept", ""
+        )
+        if wants_json:
+            return JSONResponse({"error": "auth required"}, status_code=401)
+        return RedirectResponse("/login.html")
+
+    request.state.user = user
+    return await call_next(request)
+
+
+# added last -> outermost, so request.session is populated before auth_gate runs
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET,
+    max_age=config.SESSION_MAX_AGE,
+    same_site="lax",
+    https_only=config.AUTH_ENABLED,
+)
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"ok": True}
 
 
 class Turn(BaseModel):
