@@ -26,6 +26,31 @@ def test_chat_streams_events(monkeypatch):
     assert "event: done" in body
 
 
+def test_chat_forwards_history(monkeypatch):
+    seen = {}
+
+    def capture(message, sink, **kw):
+        seen["message"] = message
+        seen["history"] = kw.get("history")
+        sink(events.Done(seconds=0.0))
+
+    monkeypatch.setattr(app_module, "orchestrator_run", capture)
+    client = TestClient(app_module.app)
+    with client.stream("POST", "/api/chat", json={
+        "session_id": "s1", "message": "follow up",
+        "history": [
+            {"role": "user", "content": "first q"},
+            {"role": "assistant", "content": "first a"},
+        ],
+    }) as r:
+        "".join(r.iter_text())
+    assert seen["message"] == "follow up"
+    assert seen["history"] == [
+        {"role": "user", "content": "first q"},
+        {"role": "assistant", "content": "first a"},
+    ]
+
+
 def test_chat_reports_errors(monkeypatch):
     def boom(message, sink, **kw):
         raise RuntimeError("kaboom")

@@ -1,7 +1,7 @@
 # Agent Chat Analytics
 
 Multi-agent backend that answers natural-language questions about a small analytics
-warehouse and returns a Vega-Lite chart, rendered by a minimal web UI.
+warehouse and returns an Apache ECharts chart, rendered by a minimal web UI.
 
 - **Orchestrator agent** — turns your question into data questions, then designs a chart.
 - **Data agent** — knows the schema, writes and runs read-only SQL against DuckDB.
@@ -24,11 +24,42 @@ uvicorn backend.app:app --port 8000
 # open http://localhost:8000
 ```
 
+## Docker
+
+```bash
+cp .env.example .env    # set your provider + key
+docker compose up --build
+# open http://localhost:8000
+```
+
+The synthetic warehouse (deterministic, seed 42) is baked into the image at
+build time; only the provider env vars are supplied at runtime via `.env`.
+Plain Docker: `docker build -t lumen-analyst . && docker run --env-file .env -p 8000:8000 lumen-analyst`.
+
+## Provider
+
+Default provider is Anthropic (`claude-opus-5`). Two OpenAI-compatible
+alternatives:
+
+```bash
+# OpenRouter (aggregator, provider fallback, strict json_schema)
+export LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY=sk-or-...          # default model: deepseek/deepseek-v4-pro-0813
+
+# DeepSeek direct (no routing hop, prompt caching, lower latency variance)
+export LLM_PROVIDER=deepseek
+export DEEPSEEK_API_KEY=sk-...               # default model: deepseek-v4-pro
+```
+
+Override the model with `LLM_MODEL` / `DATA_AGENT_MODEL`. The agentic loop,
+tool schemas and the JSON close-out are adapted per provider in
+`backend/agents/llm.py`.
+
 ## Cost
 
-Every message runs at least two Claude calls (orchestrator loop + close-out) plus the
-data agent's loop. Default model is `claude-opus-5`. Set `LLM_MODEL=claude-sonnet-5`
-(and/or `DATA_AGENT_MODEL`) to reduce cost.
+Every message runs at least two model calls (orchestrator loop + close-out) plus
+the data agent's loop. Set `LLM_MODEL` (and/or `DATA_AGENT_MODEL`) to a cheaper
+model to reduce cost.
 
 ## Tests
 

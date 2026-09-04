@@ -25,5 +25,6 @@ def test_end_to_end_revenue_by_region(tmp_path, monkeypatch):
     kinds = [e.type for e in seen]
     assert "chart" in kinds, kinds
     chart = next(e for e in seen if isinstance(e, events.Chart))
-    assert "vega-lite" in chart.spec["$schema"]
-    assert chart.spec["data"]["values"]
+    assert chart.spec["series"]
+    assert chart.spec["dataset"]["source"]
+    assert chart.spec["series"][0]["type"] in ("bar", "line", "pie", "scatter")

@@ -25,6 +25,13 @@ class Text:
 
 
 @dataclasses.dataclass(frozen=True)
+class Delta:
+    """A streamed fragment of the answer prose; appended by the UI."""
+    text: str
+    type: str = dataclasses.field(default="delta", init=False)
+
+
+@dataclasses.dataclass(frozen=True)
 class Chart:
     title: str
     meta: str
@@ -45,7 +52,7 @@ class Done:
     type: str = dataclasses.field(default="done", init=False)
 
 
-Event = Union[Step, Thinking, Text, Chart, ErrorEvent, Done]
+Event = Union[Step, Thinking, Text, Delta, Chart, ErrorEvent, Done]
 
 
 def to_sse(event: Event) -> str:

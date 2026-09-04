@@ -88,4 +88,5 @@ def test_hits_iteration_limit(monkeypatch):
     )
     assert result.hit_limit is True
     assert result.iterations == 3
-    assert any(isinstance(e, events.ErrorEvent) for e in seen)
+    # run_agent no longer sinks an error itself; the caller decides.
+    assert not any(isinstance(e, events.ErrorEvent) for e in seen)
