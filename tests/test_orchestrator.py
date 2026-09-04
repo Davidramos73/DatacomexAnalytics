@@ -98,6 +98,47 @@ def test_run_seeds_prior_conversation(monkeypatch):
     assert first_messages[2] == {"role": "user", "content": "now by month"}
 
 
+def test_chartability_prefers_a_real_breakdown_over_a_diagnostic():
+    breakdown = _dr(columns=["region", "rev"],
+                    rows=[["NA", 8.4], ["EMEA", 6.1], ["APAC", 2.7]], row_count=3)
+    diagnostic = _dr(columns=["min_rev", "max_rev"], rows=[[1.0, 9.0]], row_count=1)
+    assert orchestrator._chartability(breakdown) > orchestrator._chartability(diagnostic)
+
+
+def test_run_charts_the_best_dataset_not_the_last(monkeypatch):
+    good = _dr(columns=["region", "rev"],
+               rows=[["NA", 8.4], ["EMEA", 6.1], ["APAC", 2.7]], row_count=3)
+    diagnostic = _dr(columns=["min_rev", "max_rev"], rows=[[1.0, 9.0]], row_count=1)
+    results = iter([good, diagnostic])
+
+    final = {"answer": "a", "chart_title": "t", "chart_meta": "m",
+             "chart_type": "bar", "chart_x": "region", "chart_y": ["rev"],
+             "chart_series_by": None}
+    # two query_data tool calls, then the JSON close-out
+    script = [
+        _Resp("tool_use", [_Block(type="tool_use", id="q1", name="query_data",
+                                  input={"question": "breakdown"})]),
+        _Resp("tool_use", [_Block(type="tool_use", id="q2", name="query_data",
+                                  input={"question": "diagnostic min/max"})]),
+        _Resp("end_turn", [_Block(type="text", text="here")]),
+        _Resp("end_turn", [_Block(type="text", text=json.dumps(final))]),
+    ]
+
+    class C:
+        @property
+        def messages(self):
+            m = type("M", (), {})()
+            m.create = lambda **kw: script.pop(0)
+            return m
+
+    monkeypatch.setattr(llm, "get_client", lambda: C())
+    seen = []
+    orchestrator.run("q", seen.append, data_fn=lambda q, s, **k: next(results))
+
+    chart = next(e for e in seen if isinstance(e, events.Chart))
+    assert [row["region"] for row in chart.spec["dataset"]["source"]] == ["NA", "EMEA", "APAC"]
+
+
 def test_run_emits_chart(monkeypatch):
     final = {
         "answer": "North America leads.",
@@ -122,8 +163,9 @@ def test_run_emits_chart(monkeypatch):
 
 
 def test_run_emits_error_on_bad_chart(monkeypatch):
+    # an unknown column is recoverable now; an unsupported chart_type is not
     final = {"answer": "x", "chart_title": "t", "chart_meta": "m",
-             "chart_type": "bar", "chart_x": "missing_col", "chart_y": ["rev"],
+             "chart_type": "donut", "chart_x": "region", "chart_y": ["rev"],
              "chart_series_by": None}
     client = _client_returning(final)
     monkeypatch.setattr(llm, "get_client", lambda: client)

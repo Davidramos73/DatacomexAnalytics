@@ -71,16 +71,50 @@ def test_string_y_is_accepted():
     assert opt["series"][0]["name"] == "revenue"
 
 
-@pytest.mark.parametrize("bad", [
-    {"chart_type": "radar", "x": "region", "y": ["revenue"], "series_by": None},
-    {"chart_type": "bar", "x": "nope", "y": ["revenue"], "series_by": None},
-    {"chart_type": "bar", "x": "region", "y": [], "series_by": None},
-    {"chart_type": "bar", "x": "region", "y": ["revenue"], "series_by": "nope"},
-    "not a dict",
-])
-def test_invalid_mappings_raise(bad):
+def test_bad_chart_type_raises():
     with pytest.raises(charts.ChartError):
-        charts.build_option(bad, COLS, ROWS)
+        charts.build_option(
+            {"chart_type": "radar", "x": "region", "y": ["revenue"], "series_by": None},
+            COLS, ROWS,
+        )
+
+
+def test_non_dict_mapping_raises():
+    with pytest.raises(charts.ChartError):
+        charts.build_option("not a dict", COLS, ROWS)
+
+
+def test_empty_result_raises():
+    with pytest.raises(charts.ChartError):
+        charts.build_option(
+            {"chart_type": "bar", "x": "region", "y": ["revenue"], "series_by": None},
+            [], [],
+        )
+
+
+def test_unknown_x_falls_back_to_a_category_column():
+    opt = charts.build_option(
+        {"chart_type": "bar", "x": "segment", "y": ["revenue"], "series_by": None},
+        COLS, ROWS,  # no "segment" column here
+    )
+    assert opt["series"][0]["encode"]["x"] == "region"  # first non-numeric column
+
+
+def test_unknown_y_falls_back_to_numeric_columns():
+    opt = charts.build_option(
+        {"chart_type": "bar", "x": "region", "y": ["nope"], "series_by": None},
+        COLS, ROWS,
+    )
+    assert [s["name"] for s in opt["series"]] == ["revenue", "margin"]
+
+
+def test_unknown_series_by_is_dropped():
+    opt = charts.build_option(
+        {"chart_type": "bar", "x": "region", "y": ["revenue"], "series_by": "nope"},
+        COLS, ROWS,
+    )
+    assert "data" not in opt["series"][0]  # not pivoted
+    assert opt["series"][0]["encode"] == {"x": "region", "y": "revenue"}
 
 
 def test_rows_are_capped():

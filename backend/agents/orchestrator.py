@@ -78,6 +78,15 @@ def rows_to_records(columns: list[str], rows: list[list]) -> list[dict]:
     return [dict(zip(columns, r)) for r in rows]
 
 
+def _chartability(dataset) -> tuple:
+    """Rough score for how chartable a data-agent result is: needs rows and at
+    least one numeric column. A 1-row MIN/MAX diagnostic scores near zero."""
+    rows = min(dataset.row_count, 50)
+    records = [dict(zip(dataset.columns, r)) for r in dataset.rows[:20]]
+    has_numeric = any(charts._is_numeric(records, c) for c in dataset.columns)
+    return (rows if has_numeric else 0, rows)
+
+
 def clean_history(turns) -> list[dict]:
     """Coerce client-supplied turns into a valid alternating message list:
     only user/assistant roles, non-empty, no consecutive same-role, starts
@@ -154,7 +163,12 @@ def run(
         sink(events.Done(seconds=round(time.monotonic() - started, 1)))
         return
 
-    dataset = ok_datasets[-1]
+    # A model that over-explores often ends on a 1-row diagnostic query; chart
+    # its most chartable result (rows + a numeric column), latest wins on a tie.
+    dataset = max(
+        enumerate(ok_datasets),
+        key=lambda t: (_chartability(t[1]), t[0]),
+    )[1]
 
     payload = llm.structured_json(
         model=LLM_MODEL,
@@ -163,9 +177,14 @@ def run(
         + [
             {
                 "role": "user",
-                "content": "Now give your final answer and choose the chart mapping "
-                "for this result:\n"
-                + json.dumps({"columns": dataset.columns, "rows": dataset.rows[:50]}),
+                "content": (
+                    "Now give your final answer and the chart mapping. This is the "
+                    "ONLY result being charted - chart_x, chart_y and chart_series_by "
+                    "must be exact column names from it; ignore columns from any "
+                    "earlier query.\n"
+                    f"columns: {dataset.columns}\n"
+                    + json.dumps({"rows": dataset.rows[:50]})
+                ),
             }
         ],
         tools=[_QUERY_DATA_TOOL],
