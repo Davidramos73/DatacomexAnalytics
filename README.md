@@ -24,6 +24,18 @@ uvicorn backend.app:app --port 8000
 # open http://localhost:8000
 ```
 
+## Docker
+
+```bash
+cp .env.example .env    # set your provider + key
+docker compose up --build
+# open http://localhost:8000
+```
+
+The synthetic warehouse (deterministic, seed 42) is baked into the image at
+build time; only the provider env vars are supplied at runtime via `.env`.
+Plain Docker: `docker build -t lumen-analyst . && docker run --env-file .env -p 8000:8000 lumen-analyst`.
+
 ## Provider
 
 Default provider is Anthropic (`claude-opus-5`). Two OpenAI-compatible
