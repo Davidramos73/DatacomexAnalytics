@@ -85,7 +85,8 @@ def test_balance_endpoint(client):
     assert r.json()["widget"] == "trade_balance"
 
 
-def test_reports_page_is_served(client):
-    r = client.get("/reportes.html")
+def test_index_hosts_the_reports_view(client):
+    r = client.get("/")
     assert r.status_code == 200
-    assert "text/html" in r.headers["content-type"]
+    assert 'id="reportsView"' in r.text
+    assert "/api/v1/reports/footwear/" in r.text

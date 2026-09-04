@@ -113,6 +113,31 @@
   .chips button{padding:8px 12px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:999px;font-size:12.5px;color:#2c2a27;cursor:pointer}
   .chips button:hover{border-color:rgba(0,0,0,.28);background:#fffdfa}
 
+  /* views */
+  #chatView,#reportsView{flex:1;min-height:0;display:flex;flex-direction:column}
+  #chatView[hidden],#reportsView[hidden]{display:none}
+  .sb-nav.active{background:#2f45ad;border-color:#2f45ad}
+
+  /* reports view */
+  .rp-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 22px;border-bottom:1px solid rgba(0,0,0,.06);background:#fff}
+  .rp-filters label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#7b776f}
+  .rp-filters select,.rp-filters input{font-family:inherit;font-size:12.5px;padding:5px 7px;border:1px solid rgba(0,0,0,.14);border-radius:7px;background:#fff;color:#1c1b19;outline:none}
+  .rp-back{font-family:inherit;font-size:12px;color:#3a53c9;background:transparent;border:none;cursor:pointer;padding:6px 4px;margin-right:6px}
+  .rp-back:hover{text-decoration:underline}
+  .rp-scroll{flex:1;overflow-y:auto;padding:20px 22px}
+  .rp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:1100px;margin:0 auto}
+  .rp-card{grid-column:span 2;border:1px solid rgba(0,0,0,.09);border-radius:12px;background:#fff;overflow:hidden}
+  @media(min-width:900px){.rp-card.half{grid-column:span 1}}
+  .rp-card-head{padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
+  .rp-card-title{font-size:13px;font-weight:600}
+  .rp-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .rp-kpi{font-size:11.5px;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.05);color:#4a4740}
+  .rp-kpi.positive{background:rgba(47,143,122,.14);color:#1f6b5a}
+  .rp-kpi.negative{background:rgba(201,79,109,.14);color:#a13350}
+  .rp-chart{width:100%;height:300px}
+  .rp-meta{padding:8px 14px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#a09b93}
+  .rp-err{padding:16px;color:#8f2018;font-size:12.5px}
+
   .overlay{position:fixed;inset:0;z-index:60;background:rgba(28,27,25,.32);display:flex;align-items:center;justify-content:center;padding:24px}
   .dialog{width:100%;max-width:360px;background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.24);padding:20px}
   .dialog h3{margin:0;font-size:15px;font-weight:600}
@@ -136,10 +161,10 @@
       </button>
     </div>
     <div class="sb-actions">
-      <a class="sb-nav" href="/reportes.html" title="Panel de reportes">
+      <button class="sb-nav" id="navReports" title="Panel de reportes">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="3" y1="13" x2="13" y2="13"></line><rect x="3.5" y="7" width="2.6" height="4"></rect><rect x="9.4" y="4" width="2.6" height="7"></rect></svg>
         <span class="nc-label">Panel de reportes</span>
-      </a>
+      </button>
       <button class="new-chat" id="newChatBtn">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"></line><line x1="3" y1="8" x2="13" y2="8"></line></svg>
         <span class="nc-label">Nuevo chat</span>
@@ -158,16 +183,39 @@
       <div class="title" id="headerTitle">Nuevo chat</div>
       <div class="badge"><span></span>DataComex · TARIC 64</div>
       <div class="grow"></div>
-      <select class="theme-sel" id="themeSel" title="Chart theme"></select>
+      <select class="theme-sel" id="themeSel" title="Tema del gráfico"></select>
       <div class="engine">echarts v5</div>
     </header>
-    <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
-    <div class="composer">
-      <div class="composer-inner">
-        <textarea id="draft" rows="1" placeholder="Pregunta sobre el calzado…"></textarea>
-        <button class="send" id="send">↑</button>
+
+    <div id="chatView">
+      <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
+      <div class="composer">
+        <div class="composer-inner">
+          <textarea id="draft" rows="1" placeholder="Pregunta sobre el calzado…"></textarea>
+          <button class="send" id="send">↑</button>
+        </div>
+        <div class="hint">Comercio exterior de calzado (cap. 64). Datos sintéticos ·
+          <a href="#" id="hintReports">ver panel de reportes</a></div>
       </div>
-      <div class="hint">Comercio exterior de calzado (cap. 64). Datos sintéticos · <a href="/reportes.html" style="color:#3a53c9">ver panel de reportes</a></div>
+    </div>
+
+    <div id="reportsView" hidden>
+      <div class="rp-filters">
+        <button class="rp-back" id="rpBack" type="button">← Volver al chat</button>
+        <label>Flujo
+          <select id="rpFlow">
+            <option value="IMPORT">Importaciones</option>
+            <option value="EXPORT">Exportaciones</option>
+          </select>
+        </label>
+        <label>Partida
+          <select id="rpTaric"><option value="64">Todo el calzado (cap. 64)</option></select>
+        </label>
+        <label>Meses
+          <input id="rpMonths" type="number" min="6" max="36" value="24" style="width:70px">
+        </label>
+      </div>
+      <div class="rp-scroll"><div class="rp-grid" id="rpGrid"></div></div>
     </div>
   </main>
 </div>
@@ -467,6 +515,7 @@ function renderSidebar() {
 
     const sel = el("button", "sel"); sel.textContent = c.title;
     sel.onclick = () => {
+      setView("chat");
       if (store.activeId === c.id) return;
       store.activeId = c.id; store.save();
       openMenuId = null;
@@ -694,8 +743,96 @@ async function send() {
   busy = false; sendBtn.disabled = false;
 }
 
+/* ---------- reports view ---------- */
+const REPORT_WIDGETS = [
+  { key: "evolution", half: false,
+    url: f => `/api/v1/reports/footwear/evolution?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
+  { key: "countries", half: false,
+    url: f => `/api/v1/reports/footwear/countries?flow=${f.flow}&taric=${f.taric}&top_n=10` },
+  { key: "mix", half: true,
+    url: f => `/api/v1/reports/footwear/product-mix?flow=${f.flow}` },
+  { key: "price", half: true,
+    url: f => `/api/v1/reports/footwear/avg-price?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
+  { key: "balance", half: false,
+    url: f => `/api/v1/reports/footwear/balance?taric=${f.taric}&months=${f.months}` },
+];
+const rpCharts = {};
+let rpInited = false;
+
+const rpFilters = () => ({
+  flow: $("#rpFlow").value, taric: $("#rpTaric").value, months: $("#rpMonths").value,
+});
+
+async function loadReports() {
+  const grid = $("#rpGrid");
+  Object.values(rpCharts).forEach(c => c.dispose());
+  for (const k in rpCharts) delete rpCharts[k];
+  grid.innerHTML = "";
+  const f = rpFilters();
+
+  for (const w of REPORT_WIDGETS) {
+    const card = el("div", "rp-card" + (w.half ? " half" : ""));
+    grid.appendChild(card);
+    try {
+      const spec = await fetch(w.url(f)).then(r => r.json());
+      const head = el("div", "rp-card-head");
+      head.appendChild(el("div", "rp-card-title", spec.title || w.key));
+      const kpis = el("div", "rp-kpis");
+      (spec.kpis || []).forEach(k =>
+        kpis.appendChild(el("span", "rp-kpi " + (k.tone || ""), `${k.label}: ${k.value}`)));
+      if (kpis.children.length) head.appendChild(kpis);
+      card.appendChild(head);
+
+      const host = el("div", "rp-chart");
+      card.appendChild(host);
+      const m = spec.meta || {};
+      card.appendChild(el("div", "rp-meta",
+        [m.unit && "unidad " + m.unit, m.granularity, m.is_provisional && "· datos provisionales"]
+          .filter(Boolean).join(" ")));
+
+      const inst = echarts.init(host, chartTheme === "default" ? null : chartTheme, { renderer: "svg" });
+      inst.setOption(Object.assign({ backgroundColor: "transparent" }, spec.echarts));
+      new ResizeObserver(() => inst.resize()).observe(host);
+      rpCharts[w.key] = inst;
+    } catch (e) {
+      card.appendChild(el("div", "rp-err", `No se pudo cargar «${w.key}»: ${e}`));
+    }
+  }
+}
+
+async function initReports() {
+  try {
+    const opts = await fetch("/api/v1/reports/footwear/filters/options").then(r => r.json());
+    const sel = $("#rpTaric");
+    (opts.headings || []).forEach(h => {
+      const o = el("option", null, `${h.code} — ${h.description}`);
+      o.value = h.code;
+      sel.appendChild(o);
+    });
+  } catch (e) { /* selectores mínimos si falla */ }
+  ["#rpFlow", "#rpTaric", "#rpMonths"].forEach(s => $(s).addEventListener("change", loadReports));
+}
+
+function setView(v) {
+  const reports = v === "reports";
+  $("#chatView").hidden = reports;
+  $("#reportsView").hidden = !reports;
+  $("#navReports").classList.toggle("active", reports);
+  $("#themeSel").hidden = reports;
+  $("#headerTitle").textContent = reports ? "Panel de reportes" : store.active().title;
+  if (reports) {
+    if (!rpInited) { rpInited = true; initReports().then(loadReports); }
+    else loadReports();
+  }
+}
+
+$("#navReports").onclick = () => setView("reports");
+$("#rpBack").onclick = () => setView("chat");
+$("#hintReports").onclick = e => { e.preventDefault(); setView("reports"); };
+
 /* ---------- wiring ---------- */
 $("#newChatBtn").onclick = () => {
+  setView("chat");
   const chat = store.active();
   if (chat.messages.length === 0) { draft.focus(); return; }
   store.newChat();
