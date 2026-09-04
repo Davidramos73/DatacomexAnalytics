@@ -10,6 +10,20 @@ from backend.config import MAX_AGENT_ITERS, MAX_TOKENS
 
 _client = None
 
+# providers that speak the OpenAI chat-completions API
+_OPENAI_COMPATIBLE = ("openrouter", "deepseek")
+
+
+def _is_openai_compatible() -> bool:
+    return config.LLM_PROVIDER in _OPENAI_COMPATIBLE
+
+
+def _max_output_tokens() -> int:
+    # deepseek-chat caps completion at 8192; OpenRouter/Anthropic allow more.
+    if config.LLM_PROVIDER == "deepseek":
+        return min(MAX_TOKENS, 8000)
+    return MAX_TOKENS
+
 
 def get_client():
     global _client
@@ -21,6 +35,13 @@ def get_client():
                 base_url=config.OPENROUTER_BASE_URL,
                 api_key=config.OPENROUTER_API_KEY or None,
                 default_headers={"X-Title": "Lumen Analyst"},
+            )
+        elif config.LLM_PROVIDER == "deepseek":
+            from openai import OpenAI
+
+            _client = OpenAI(
+                base_url=config.DEEPSEEK_BASE_URL,
+                api_key=config.DEEPSEEK_API_KEY or None,
             )
         else:
             import anthropic
@@ -161,7 +182,8 @@ def _run_agent_anthropic(
         final_text = _text_of(response.content)
         return AgentResult(final_text, messages, tool_calls, iterations, False)
 
-    sink(events.ErrorEvent(message=f"agent exceeded {max_iters} iterations"))
+    # Hit the iteration cap. Let the caller decide what to do with whatever
+    # tool output we gathered rather than surfacing an error unconditionally.
     return AgentResult(final_text, messages, tool_calls, iterations, True)
 
 
@@ -203,7 +225,7 @@ def _run_agent_openai(
             model=model,
             messages=msgs,
             tools=oai_tools,
-            max_tokens=MAX_TOKENS,
+            max_tokens=_max_output_tokens(),
         )
         msg = response.choices[0].message
         msgs.append(_assistant_entry(msg))
@@ -227,7 +249,7 @@ def _run_agent_openai(
         if iterations >= max_iters:
             break
 
-    sink(events.ErrorEvent(message=f"agent exceeded {max_iters} iterations"))
+    # Hit the iteration cap — return what we have; the caller decides.
     return AgentResult(final_text, msgs, tool_calls, iterations, True)
 
 
@@ -246,11 +268,7 @@ def run_agent(
     max_iters: int | None = None,
 ) -> AgentResult:
     max_iters = MAX_AGENT_ITERS if max_iters is None else max_iters
-    impl = (
-        _run_agent_openai
-        if config.LLM_PROVIDER == "openrouter"
-        else _run_agent_anthropic
-    )
+    impl = _run_agent_openai if _is_openai_compatible() else _run_agent_anthropic
     return impl(
         model=model,
         system=system,
@@ -279,12 +297,10 @@ def structured_json(
     """
     client = get_client()
 
-    if config.LLM_PROVIDER == "openrouter":
-        # Strict json_schema when the model supports it (flat schema — no nested
-        # objects or stringified blobs, so no truncation risk); a key-list nudge
-        # and lenient parsing catch models that ignore the schema. No `tools`:
-        # offering them next to a forced-JSON response makes some models emit a
-        # tool call instead.
+    if _is_openai_compatible():
+        # A key-list nudge plus lenient parsing keeps this working even when the
+        # model ignores response_format. No `tools`: offering them next to a
+        # forced-JSON response makes some models emit a tool call instead.
         keys = ", ".join(schema.get("properties", {}))
         nudge = (
             f"\n\nRespond with ONLY a JSON object with these keys: {keys}. "
@@ -296,10 +312,18 @@ def structured_json(
         else:
             msgs.append({"role": "user", "content": nudge.strip()})
 
-        response_format = {
-            "type": "json_schema",
-            "json_schema": {"name": schema_name, "strict": True, "schema": schema},
-        }
+        # OpenRouter can enforce a strict flat schema; DeepSeek's own API only
+        # does json_object. Both fall back to json_object on the retry.
+        if config.LLM_PROVIDER == "openrouter":
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name, "strict": True, "schema": schema
+                },
+            }
+        else:
+            response_format = {"type": "json_object"}
+
         last_err: Exception | None = None
         for attempt in range(2):
             if attempt == 1:  # retry without the schema, in case it choked on it
@@ -307,7 +331,7 @@ def structured_json(
             choice = client.chat.completions.create(
                 model=model,
                 messages=msgs,
-                max_tokens=MAX_TOKENS,
+                max_tokens=_max_output_tokens(),
                 response_format=response_format,
             ).choices[0]
             content = choice.message.content

@@ -52,3 +52,15 @@ def test_openrouter_provider_switches_default_model(monkeypatch):
     assert config.LLM_PROVIDER == "openrouter"
     assert config.LLM_MODEL == "deepseek/deepseek-v4-pro-0813"
     assert config.OPENROUTER_BASE_URL.endswith("/api/v1")
+
+
+def test_deepseek_provider_defaults(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "deepseek")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("DATA_AGENT_MODEL", raising=False)
+    import backend.config as config
+    importlib.reload(config)
+    assert config.LLM_PROVIDER == "deepseek"
+    assert config.LLM_MODEL == "deepseek-chat"
+    assert config.DATA_AGENT_MODEL == "deepseek-chat"
+    assert config.DEEPSEEK_BASE_URL == "https://api.deepseek.com"

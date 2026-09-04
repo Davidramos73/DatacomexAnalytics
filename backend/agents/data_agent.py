@@ -10,24 +10,20 @@ from backend.warehouse import db, schema
 
 _SYSTEM = """\
 You are a senior data analyst with read-only access to a small analytics warehouse.
-Given a question, write ONE SQL SELECT that answers it, run it with the run_sql tool,
-and then briefly state what the data shows.
+The full schema, business notes and sample rows are below - you do NOT need to look
+them up.
 
 {schema}
 
-Guidance:
-- Call get_schema only if you need to re-check column names.
-- Prefer a single GROUP BY aggregation. Alias output columns in friendly snake_case.
-- Keep result sets small (a handful of rows is ideal for charting).
-- If run_sql returns an error, fix the SQL and try again.
+Do exactly this:
+1. Call run_sql ONCE with a single SQL SELECT that answers the question. Prefer one
+   GROUP BY aggregation; alias columns in friendly snake_case; keep the result to a
+   handful of rows (ideal for charting).
+2. Then state in one sentence what the data shows. Do not call run_sql again unless
+   it returned an error - if so, fix the SQL and retry once.
 """
 
 _TOOLS = [
-    {
-        "name": "get_schema",
-        "description": "Return the warehouse schema, business notes and sample rows.",
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
-    },
     {
         "name": "run_sql",
         "description": "Execute a read-only SQL SELECT against the warehouse and return columns + rows as JSON.",
@@ -56,8 +52,6 @@ class DataResult:
 def _step_label(name: str, tool_input: dict) -> events.Step:
     if name == "run_sql":
         return events.Step(label="sql.query", detail=tool_input.get("sql", ""))
-    if name == "get_schema":
-        return events.Step(label="schema.lookup")
     return events.Step(label=name)
 
 
@@ -67,9 +61,6 @@ def answer_data_question(question: str, sink: llm.Sink, *, con=None) -> DataResu
     try:
         schema_ctx = schema.schema_context(con)
 
-        def _get_schema() -> str:
-            return schema_ctx
-
         def _run_sql(sql: str) -> str:
             return json.dumps(db.run_sql(con, sql))
 
@@ -78,7 +69,7 @@ def answer_data_question(question: str, sink: llm.Sink, *, con=None) -> DataResu
             system=_SYSTEM.format(schema=schema_ctx),
             messages=[{"role": "user", "content": question}],
             tools=_TOOLS,
-            tool_impls={"get_schema": _get_schema, "run_sql": _run_sql},
+            tool_impls={"run_sql": _run_sql},
             sink=sink,
             step_label=_step_label,
         )

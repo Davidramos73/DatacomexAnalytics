@@ -51,6 +51,43 @@ def as_openrouter(monkeypatch):
     llm.reset_client()
 
 
+@pytest.fixture
+def as_deepseek(monkeypatch):
+    monkeypatch.setattr(llm.config, "LLM_PROVIDER", "deepseek")
+    llm.reset_client()
+    yield
+    llm.reset_client()
+
+
+def test_deepseek_shares_the_openai_agent_loop(monkeypatch, as_deepseek):
+    fake = FakeOpenAI([
+        _Resp(_Message(tool_calls=[_ToolCall("c1", "run_sql", '{"sql": "SELECT 1"}')])),
+        _Resp(_Message(content="ok")),
+    ])
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    result = llm.run_agent(
+        model="deepseek-chat", system="s",
+        messages=[{"role": "user", "content": "go"}],
+        tools=[{"name": "run_sql"}],
+        tool_impls={"run_sql": lambda sql: "1 row"},
+        sink=lambda e: None,
+    )
+    assert result.final_text == "ok"
+    assert fake.calls[0]["messages"][0]["role"] == "system"
+
+
+def test_deepseek_structured_json_uses_json_object(monkeypatch, as_deepseek):
+    fake = FakeOpenAI([_Resp(_Message(content='{"a": 1}'))])
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    out = llm.structured_json(
+        model="deepseek-chat", system="s",
+        messages=[{"role": "user", "content": "q"}],
+        tools=[], schema={"type": "object", "properties": {"a": {}}},
+    )
+    assert out == {"a": 1}
+    assert fake.calls[0]["response_format"] == {"type": "json_object"}
+
+
 def test_to_openai_tools_shape():
     out = llm.to_openai_tools(
         [{"name": "f", "description": "d", "input_schema": {"type": "object"}}]

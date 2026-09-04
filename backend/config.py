@@ -1,19 +1,23 @@
 import os
 from pathlib import Path
 
-# "anthropic" (default) uses the Anthropic Messages API; "openrouter" uses the
-# OpenAI-compatible chat-completions API at OpenRouter.
+# "anthropic" (default) uses the Anthropic Messages API; "openrouter" and
+# "deepseek" use the OpenAI-compatible chat-completions API (OpenRouter's
+# aggregator, or DeepSeek's own endpoint).
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic").lower()
+
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = os.environ.get(
     "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
 )
 
-_DEFAULT_MODEL = (
-    "deepseek/deepseek-v4-pro-0813"
-    if LLM_PROVIDER == "openrouter"
-    else "claude-opus-5"
-)
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+_DEFAULT_MODEL = {
+    "openrouter": "deepseek/deepseek-v4-pro-0813",
+    "deepseek": "deepseek-chat",
+}.get(LLM_PROVIDER, "claude-opus-5")
 LLM_MODEL = os.environ.get("LLM_MODEL", _DEFAULT_MODEL)
 DATA_AGENT_MODEL = os.environ.get("DATA_AGENT_MODEL", LLM_MODEL)
 

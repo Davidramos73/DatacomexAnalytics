@@ -20,7 +20,10 @@ via the query_data tool. Your job:
    series, or null). Use the exact column names returned by the query. The UI
    builds and styles the actual chart.
 
-Call query_data at least once before answering. Do not invent numbers.
+Call query_data as few times as possible - almost always exactly ONCE. As
+soon as one result answers the user's question, STOP calling tools and give
+your final answer. Do NOT re-query to reformat, to "double-check", or to add
+columns you do not need. Never invent numbers.
 
 Earlier turns of this conversation may be provided for context. The user's
 latest message can build on them (e.g. "now break that down by month" or
@@ -112,15 +115,25 @@ def run(
         datasets.append(result)
         if not result.ok:
             return json.dumps({"error": result.error})
-        return json.dumps(
-            {
-                "sql": result.sql,
-                "columns": result.columns,
-                "rows": result.rows,
-                "row_count": result.row_count,
-                "truncated": result.truncated,
-            }
-        )
+        payload = {
+            "sql": result.sql,
+            "columns": result.columns,
+            "rows": result.rows,
+            "row_count": result.row_count,
+            "truncated": result.truncated,
+        }
+        # Weaker models keep re-querying; make "you're done" explicit.
+        ok_so_far = sum(1 for d in datasets if d.ok)
+        if ok_so_far == 1:
+            payload["note"] = (
+                "This answers the question. Do NOT call query_data again - "
+                "give your final answer now."
+            )
+        else:
+            payload["note"] = (
+                "Stop calling query_data. Answer now using the data you have."
+            )
+        return json.dumps(payload)
 
     agent = llm.run_agent(
         model=LLM_MODEL,
