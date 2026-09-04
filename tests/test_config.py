@@ -61,6 +61,6 @@ def test_deepseek_provider_defaults(monkeypatch):
     import backend.config as config
     importlib.reload(config)
     assert config.LLM_PROVIDER == "deepseek"
-    assert config.LLM_MODEL == "deepseek-chat"
-    assert config.DATA_AGENT_MODEL == "deepseek-chat"
+    assert config.LLM_MODEL == "deepseek-v4-pro"
+    assert config.DATA_AGENT_MODEL == "deepseek-v4-pro"
     assert config.DEEPSEEK_BASE_URL == "https://api.deepseek.com"

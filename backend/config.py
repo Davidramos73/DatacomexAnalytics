@@ -16,7 +16,9 @@ DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.co
 
 _DEFAULT_MODEL = {
     "openrouter": "deepseek/deepseek-v4-pro-0813",
-    "deepseek": "deepseek-chat",
+    # NB: the `deepseek-chat` alias currently resolves to V4 Flash (weak);
+    # name the Pro model explicitly.
+    "deepseek": "deepseek-v4-pro",
 }.get(LLM_PROVIDER, "claude-opus-5")
 LLM_MODEL = os.environ.get("LLM_MODEL", _DEFAULT_MODEL)
 DATA_AGENT_MODEL = os.environ.get("DATA_AGENT_MODEL", LLM_MODEL)

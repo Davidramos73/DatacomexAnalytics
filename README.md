@@ -36,7 +36,7 @@ export OPENROUTER_API_KEY=sk-or-...          # default model: deepseek/deepseek-
 
 # DeepSeek direct (no routing hop, prompt caching, lower latency variance)
 export LLM_PROVIDER=deepseek
-export DEEPSEEK_API_KEY=sk-...               # default model: deepseek-chat
+export DEEPSEEK_API_KEY=sk-...               # default model: deepseek-v4-pro
 ```
 
 Override the model with `LLM_MODEL` / `DATA_AGENT_MODEL`. The agentic loop,
