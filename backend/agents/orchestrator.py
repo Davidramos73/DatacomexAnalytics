@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from backend import events
+from backend import charts, events
 from backend.agents import llm
 from backend.agents.data_agent import answer_data_question
 from backend.config import LLM_MODEL
@@ -14,18 +14,11 @@ via the query_data tool. Your job:
 1. Turn the user's question into one or more precise data questions and call query_data.
 2. Read the returned columns/rows.
 3. Explain the finding in 1-3 short sentences of prose.
-4. Design an appropriate Apache ECharts v5 `option` object for the returned data.
-
-ECharts chart rules:
-- Return a plain `option` object (the argument to `chart.setOption`).
-- Leave the data unbound: do NOT put rows in `series[].data`. The rows are
-  injected as `option.dataset.source` (an array of row objects keyed by column
-  name); reference columns via each series' `encode` (e.g.
-  {"x": "month", "y": "revenue"}) or, for pie, `encode: {"itemName": "region",
-  "value": "rev"}`.
-- Allowed series `type`: bar, line, pie, scatter.
-- Include `xAxis`/`yAxis` for cartesian charts (omit for pie).
-- Do NOT set colors, fonts, or a `backgroundColor` - the UI applies a theme.
+4. Choose how to chart the result: chart_type (bar, line, pie or scatter),
+   chart_x (the category / x-axis column), chart_y (an array of one or more
+   numeric columns), and chart_series_by (a column to split into multiple
+   series, or null). Use the exact column names returned by the query. The UI
+   builds and styles the actual chart.
 
 Call query_data at least once before answering. Do not invent numbers.
 
@@ -48,24 +41,34 @@ _QUERY_DATA_TOOL = {
     },
 }
 
+# Flat, no nested objects — models follow this far more reliably in JSON mode.
 _RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
         "answer": {"type": "string"},
         "chart_title": {"type": "string"},
         "chart_meta": {"type": "string"},
-        "echarts_option": {
+        "chart_type": {"type": "string", "enum": list(charts.ALLOWED_TYPES)},
+        "chart_x": {
             "type": "string",
-            "description": "The ECharts v5 option object as a JSON-encoded string.",
+            "description": "result column for the category / x axis (pie slice label)",
+        },
+        "chart_y": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "one or more numeric result columns for the y axis / pie value",
+        },
+        "chart_series_by": {
+            "type": ["string", "null"],
+            "description": "result column to split into multiple series, or null",
         },
     },
-    "required": ["answer", "chart_title", "chart_meta", "echarts_option"],
+    "required": [
+        "answer", "chart_title", "chart_meta",
+        "chart_type", "chart_x", "chart_y", "chart_series_by",
+    ],
     "additionalProperties": False,
 }
-
-
-class SpecError(ValueError):
-    """Raised when the model's ECharts option is structurally invalid."""
 
 
 def rows_to_records(columns: list[str], rows: list[list]) -> list[dict]:
@@ -89,24 +92,6 @@ def clean_history(turns) -> list[dict]:
     while out and out[0]["role"] != "user":
         out.pop(0)
     return out[-MAX_HISTORY_TURNS:]
-
-
-def validate_echarts_option(option: dict, rows_records: list[dict]) -> dict:
-    if not isinstance(option, dict):
-        raise SpecError("option is not an object")
-    series = option.get("series")
-    if isinstance(series, dict):
-        series = [series]
-    if not series or not isinstance(series, list):
-        raise SpecError("option has no 'series'")
-
-    option = json.loads(json.dumps(option))  # deep copy
-    # Bind the data unless the model already inlined a dataset.
-    dataset = option.get("dataset")
-    has_source = isinstance(dataset, dict) and dataset.get("source")
-    if not has_source:
-        option["dataset"] = {"source": rows_records}
-    return option
 
 
 def run(
@@ -157,7 +142,6 @@ def run(
         return
 
     dataset = ok_datasets[-1]
-    records = rows_to_records(dataset.columns, dataset.rows)
 
     payload = llm.structured_json(
         model=LLM_MODEL,
@@ -166,8 +150,8 @@ def run(
         + [
             {
                 "role": "user",
-                "content": "Now produce your final answer and ECharts v5 option "
-                "for this dataset (leave data unbound; it will be injected):\n"
+                "content": "Now give your final answer and choose the chart mapping "
+                "for this result:\n"
                 + json.dumps({"columns": dataset.columns, "rows": dataset.rows[:50]}),
             }
         ],
@@ -183,21 +167,19 @@ def run(
         elif not isinstance(val, str):
             payload[key] = json.dumps(val) if isinstance(val, (dict, list)) else str(val)
 
-    if isinstance(payload.get("echarts_option"), str):
-        try:
-            payload["echarts_option"] = json.loads(payload["echarts_option"])
-        except json.JSONDecodeError as exc:
-            sink(events.Text(text=payload.get("answer", "")))
-            sink(events.ErrorEvent(message=f"Invalid ECharts option: {exc}"))
-            sink(events.Done(seconds=round(time.monotonic() - started, 1)))
-            return
+    chart = {
+        "chart_type": payload.get("chart_type"),
+        "x": payload.get("chart_x"),
+        "y": payload.get("chart_y"),
+        "series_by": payload.get("chart_series_by"),
+    }
 
     sink(events.Step(label="chart.render", detail="echarts v5"))
     try:
-        spec = validate_echarts_option(payload["echarts_option"], records)
-    except SpecError as exc:
+        spec = charts.build_option(chart, dataset.columns, dataset.rows)
+    except charts.ChartError as exc:
         sink(events.Text(text=payload.get("answer", "")))
-        sink(events.ErrorEvent(message=f"Invalid ECharts option: {exc}"))
+        sink(events.ErrorEvent(message=f"Could not build chart: {exc}"))
         sink(events.Done(seconds=round(time.monotonic() - started, 1)))
         return
 

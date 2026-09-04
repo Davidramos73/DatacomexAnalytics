@@ -160,7 +160,8 @@ def test_structured_json_openai(monkeypatch, as_openrouter):
         schema_name="chart_response",
     )
     assert out["chart_title"] == "t"
-    assert fake.calls[0]["response_format"] == {"type": "json_object"}
+    assert fake.calls[0]["response_format"]["type"] == "json_schema"
+    assert fake.calls[0]["response_format"]["json_schema"]["strict"] is True
     # the schema's keys are surfaced to the model as an instruction
     assert "echarts_option" in fake.calls[0]["messages"][-1]["content"]
     assert "tools" not in fake.calls[0]
@@ -179,3 +180,6 @@ def test_structured_json_openai_retries_on_bad_json(monkeypatch, as_openrouter):
     )
     assert out == {"ok": True}
     assert len(fake.calls) == 2
+    # first attempt strict json_schema, retry falls back to json_object
+    assert fake.calls[0]["response_format"]["type"] == "json_schema"
+    assert fake.calls[1]["response_format"] == {"type": "json_object"}

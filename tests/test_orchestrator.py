@@ -1,5 +1,4 @@
 import json
-import pytest
 from backend import events
 from backend.agents import orchestrator, llm, data_agent
 
@@ -80,7 +79,7 @@ def test_clean_history_caps_length():
 def test_run_seeds_prior_conversation(monkeypatch):
     final = {
         "answer": "ok", "chart_title": "t", "chart_meta": "m",
-        "echarts_option": {"series": [{"type": "bar"}]},
+        "chart_type": "bar", "chart_x": "region", "chart_y": ["rev"], "chart_series_by": None,
     }
     client = _client_returning(final)
     type(client).calls = []
@@ -99,34 +98,12 @@ def test_run_seeds_prior_conversation(monkeypatch):
     assert first_messages[2] == {"role": "user", "content": "now by month"}
 
 
-def test_validate_binds_dataset_source():
-    option = {"series": [{"type": "bar"}], "xAxis": {"type": "category"}, "yAxis": {}}
-    out = orchestrator.validate_echarts_option(option, [{"region": "NA", "rev": 8.4}])
-    assert out["dataset"]["source"] == [{"region": "NA", "rev": 8.4}]
-
-
-def test_validate_keeps_inline_dataset():
-    option = {"series": [{"type": "pie"}],
-              "dataset": {"source": [{"k": "a", "v": 1}]}}
-    out = orchestrator.validate_echarts_option(option, [{"k": "b", "v": 2}])
-    assert out["dataset"]["source"] == [{"k": "a", "v": 1}]
-
-
-def test_validate_rejects_seriesless_option():
-    with pytest.raises(orchestrator.SpecError):
-        orchestrator.validate_echarts_option({"xAxis": {}}, [])
-
-
 def test_run_emits_chart(monkeypatch):
     final = {
         "answer": "North America leads.",
         "chart_title": "Q3 revenue by region",
         "chart_meta": "bar · fct_orders · 2 rows",
-        "echarts_option": {
-            "xAxis": {"type": "category"},
-            "yAxis": {"type": "value"},
-            "series": [{"type": "bar", "encode": {"x": "region", "y": "rev"}}],
-        },
+        "chart_type": "bar", "chart_x": "region", "chart_y": ["rev"], "chart_series_by": None,
     }
     client = _client_returning(final)
     type(client).calls = []
@@ -138,14 +115,16 @@ def test_run_emits_chart(monkeypatch):
     assert "text" in kinds and "chart" in kinds and "done" in kinds
     chart = next(e for e in seen if isinstance(e, events.Chart))
     assert chart.spec["dataset"]["source"][0]["region"] == "NA"
+    assert chart.spec["series"][0]["type"] == "bar"
     assert chart.title == "Q3 revenue by region"
     # close-out call must carry tools= (history contains tool_use blocks)
     assert "tools" in type(client).calls[-1]
 
 
-def test_run_emits_error_on_bad_spec(monkeypatch):
+def test_run_emits_error_on_bad_chart(monkeypatch):
     final = {"answer": "x", "chart_title": "t", "chart_meta": "m",
-             "echarts_option": {"xAxis": {}}}
+             "chart_type": "bar", "chart_x": "missing_col", "chart_y": ["rev"],
+             "chart_series_by": None}
     client = _client_returning(final)
     monkeypatch.setattr(llm, "get_client", lambda: client)
     seen = []

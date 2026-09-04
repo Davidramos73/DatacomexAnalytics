@@ -27,3 +27,4 @@ def test_end_to_end_revenue_by_region(tmp_path, monkeypatch):
     chart = next(e for e in seen if isinstance(e, events.Chart))
     assert chart.spec["series"]
     assert chart.spec["dataset"]["source"]
+    assert chart.spec["series"][0]["type"] in ("bar", "line", "pie", "scatter")

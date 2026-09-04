@@ -280,15 +280,15 @@ def structured_json(
     client = get_client()
 
     if config.LLM_PROVIDER == "openrouter":
-        # json_object (not json_schema): a Vega/ECharts option can't be strictly
-        # schematised, and nesting it as an escaped string invites truncation and
-        # escaping bugs. We steer the shape via an instruction and parse both a
-        # nested object and a stringified one. No `tools`: offering them next to
-        # a forced-JSON response makes some models emit a tool call instead.
+        # Strict json_schema when the model supports it (flat schema — no nested
+        # objects or stringified blobs, so no truncation risk); a key-list nudge
+        # and lenient parsing catch models that ignore the schema. No `tools`:
+        # offering them next to a forced-JSON response makes some models emit a
+        # tool call instead.
         keys = ", ".join(schema.get("properties", {}))
         nudge = (
             f"\n\nRespond with ONLY a JSON object with these keys: {keys}. "
-            "`echarts_option` must be a JSON object, not a string."
+            "Every value must match the type asked for above."
         )
         msgs = list(messages)
         if msgs and msgs[-1].get("role") == "user":
@@ -296,13 +296,19 @@ def structured_json(
         else:
             msgs.append({"role": "user", "content": nudge.strip()})
 
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {"name": schema_name, "strict": True, "schema": schema},
+        }
         last_err: Exception | None = None
-        for _ in range(2):  # one retry — response_format is best-effort
+        for attempt in range(2):
+            if attempt == 1:  # retry without the schema, in case it choked on it
+                response_format = {"type": "json_object"}
             choice = client.chat.completions.create(
                 model=model,
                 messages=msgs,
                 max_tokens=MAX_TOKENS,
-                response_format={"type": "json_object"},
+                response_format=response_format,
             ).choices[0]
             content = choice.message.content
             if content:
