@@ -39,10 +39,40 @@ def _default_con():
     return duckdb.connect(str(config.DATACOMEX_PATH), read_only=True)
 
 
+_FLOW_LABEL = {"IMPORT": "Importación", "EXPORT": "Exportación"}
+
+_STEP_TITLES = {
+    "footwear_market_overview": "Analizando la evolución del comercio",
+    "footwear_top_partners": "Calculando el ranking de países",
+    "footwear_product_mix": "Desglosando el mix de producto",
+    "footwear_avg_price": "Calculando el precio medio",
+    "footwear_trade_balance": "Calculando la balanza comercial",
+}
+
+
 def _step_label(name: str, tool_input: dict) -> events.Step:
     if name == "resolve_footwear_product":
-        return events.Step(label="resolve.taric", detail=tool_input.get("term", ""))
-    return events.Step(label=name, detail=json.dumps(tool_input, ensure_ascii=False))
+        term = tool_input.get("term", "")
+        return events.Step(
+            label="Identificando el producto",
+            detail=f"«{term}»" if term else None,
+        )
+
+    label = _STEP_TITLES.get(name, name)
+    bits = []
+    flow = tool_input.get("flow")
+    if flow:
+        bits.append(_FLOW_LABEL.get(flow, flow))
+    heading = tool_input.get("heading")
+    if heading and heading != "64":
+        bits.append(f"partida {heading}")
+    if tool_input.get("top_n"):
+        bits.append(f"top {tool_input['top_n']}")
+    if tool_input.get("country"):
+        bits.append(tool_input["country"])
+    if tool_input.get("months"):
+        bits.append(f"{tool_input['months']} meses")
+    return events.Step(label=label, detail=" · ".join(bits) or None)
 
 
 def _last_report(tool_calls) -> dict | None:
