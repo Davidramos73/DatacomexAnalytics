@@ -564,6 +564,7 @@ function liveAgentBlock() {
 
   const thinking = el("div", "thinking", "<i></i><i></i><i></i><span></span>");
   body.appendChild(thinking);
+  let paraEl = null;  // the paragraph currently being streamed into
 
   return {
     thinking(label) { thinking.querySelector("span").textContent = label; },
@@ -576,7 +577,16 @@ function liveAgentBlock() {
       trace.querySelector("summary").textContent =
         stepsEl.children.length === 1 ? "1 step" : stepsEl.children.length + " steps";
     },
-    text(t) { thinking.remove(); body.appendChild(el("div", "para", esc(t))); },
+    delta(t) {
+      thinking.remove();
+      if (!paraEl) { paraEl = el("div", "para"); body.appendChild(paraEl); }
+      paraEl.textContent += t;
+    },
+    text(t) {
+      thinking.remove();
+      if (paraEl) { paraEl.textContent = t; paraEl = null; }
+      else body.appendChild(el("div", "para", esc(t)));
+    },
     error(msg) {
       thinking.remove();
       const c = el("div", "card");
@@ -659,7 +669,8 @@ async function send() {
       const d = JSON.parse(dataLine.slice(6));
       if (ev === "thinking") agent.thinking(d.label);
       else if (ev === "step") { agent.step(d.label, d.detail); aMsg.steps.push({ label: d.label, detail: d.detail }); }
-      else if (ev === "text") { agent.text(d.text); aMsg.paras.push(d.text); }
+      else if (ev === "delta") agent.delta(d.text);
+      else if (ev === "text") { agent.text(d.text); aMsg.paras = [d.text]; }
       else if (ev === "chart") { agent.chart(d); aMsg.chart = { title: d.title, meta: d.meta, spec: d.spec }; }
       else if (ev === "error") { agent.error(d.message); aMsg.error = d.message; }
       else if (ev === "done") { agent.done(); aMsg.time = d.seconds; }

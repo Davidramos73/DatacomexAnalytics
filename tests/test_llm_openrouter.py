@@ -76,6 +76,37 @@ def test_deepseek_shares_the_openai_agent_loop(monkeypatch, as_deepseek):
     assert fake.calls[0]["messages"][0]["role"] == "system"
 
 
+def test_stream_text_yields_content_deltas(monkeypatch, as_openrouter):
+    class _Delta:
+        def __init__(self, content): self.content = content
+
+    class _Chunk:
+        def __init__(self, content):
+            self.choices = [type("C", (), {"delta": _Delta(content)})()]
+
+    class _StreamClient:
+        def __init__(self):
+            self.calls = []
+            outer = self
+
+            class _Completions:
+                def create(self, **kw):
+                    outer.calls.append(kw)
+                    return iter([_Chunk("Hello "), _Chunk(None), _Chunk("world")])
+
+            self.chat = type("Chat", (), {"completions": _Completions()})()
+
+    fake = _StreamClient()
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    out = "".join(llm.stream_text(
+        model="m", system="s",
+        messages=[{"role": "system", "content": "s"}, {"role": "user", "content": "hi"}],
+    ))
+    assert out == "Hello world"
+    assert fake.calls[0]["stream"] is True
+    assert fake.calls[0]["reasoning_effort"] == "low"
+
+
 def test_deepseek_structured_json_uses_json_object(monkeypatch, as_deepseek):
     fake = FakeOpenAI([_Resp(_Message(content='{"a": 1}'))])
     monkeypatch.setattr(llm, "get_client", lambda: fake)

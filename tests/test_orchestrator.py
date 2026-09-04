@@ -19,13 +19,27 @@ class _Resp:
         self.stop_reason, self.content = stop_reason, content
 
 
-def _client_returning(final_json):
-    """Fake client: first the tool-use turn calling query_data, then the JSON close-out."""
+class _FakeStream:
+    """Stand-in for anthropic client.messages.stream(...) context manager."""
+    def __init__(self, text): self._text = text
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    @property
+    def text_stream(self):
+        yield self._text
+
+
+PROSE = "North America leads the quarter."
+
+
+def _client_returning(chart_mapping):
+    """Fake Anthropic client: the query_data tool turn, then (prose is streamed)
+    the structured chart-mapping close-out."""
     script = [
         _Resp("tool_use", [_Block(type="tool_use", id="q", name="query_data",
                                   input={"question": "revenue by region"})]),
         _Resp("end_turn", [_Block(type="text", text="Here is the breakdown.")]),
-        _Resp("end_turn", [_Block(type="text", text=json.dumps(final_json))]),
+        _Resp("end_turn", [_Block(type="text", text=json.dumps(chart_mapping))]),
     ]
 
     class C:
@@ -40,6 +54,7 @@ def _client_returning(final_json):
                 return script.pop(0)
 
             m.create = create
+            m.stream = lambda **kw: _FakeStream(PROSE)
             return m
     return C()
 
@@ -111,10 +126,10 @@ def test_run_charts_the_best_dataset_not_the_last(monkeypatch):
     diagnostic = _dr(columns=["min_rev", "max_rev"], rows=[[1.0, 9.0]], row_count=1)
     results = iter([good, diagnostic])
 
-    final = {"answer": "a", "chart_title": "t", "chart_meta": "m",
+    final = {"chart_title": "t", "chart_meta": "m",
              "chart_type": "bar", "chart_x": "region", "chart_y": ["rev"],
              "chart_series_by": None}
-    # two query_data tool calls, then the JSON close-out
+    # two query_data tool calls, then the structured chart-mapping close-out
     script = [
         _Resp("tool_use", [_Block(type="tool_use", id="q1", name="query_data",
                                   input={"question": "breakdown"})]),
@@ -129,6 +144,7 @@ def test_run_charts_the_best_dataset_not_the_last(monkeypatch):
         def messages(self):
             m = type("M", (), {})()
             m.create = lambda **kw: script.pop(0)
+            m.stream = lambda **kw: _FakeStream("prose")
             return m
 
     monkeypatch.setattr(llm, "get_client", lambda: C())
@@ -141,7 +157,6 @@ def test_run_charts_the_best_dataset_not_the_last(monkeypatch):
 
 def test_run_emits_chart(monkeypatch):
     final = {
-        "answer": "North America leads.",
         "chart_title": "Q3 revenue by region",
         "chart_meta": "bar · fct_orders · 2 rows",
         "chart_type": "bar", "chart_x": "region", "chart_y": ["rev"], "chart_series_by": None,
@@ -153,12 +168,14 @@ def test_run_emits_chart(monkeypatch):
     orchestrator.run("revenue by region?", seen.append, data_fn=lambda q, s, **k: _dr())
 
     kinds = [e.type for e in seen]
-    assert "text" in kinds and "chart" in kinds and "done" in kinds
+    assert "delta" in kinds and "text" in kinds and "chart" in kinds and "done" in kinds
+    # the streamed prose is consolidated into the final text event
+    assert next(e for e in seen if isinstance(e, events.Text)).text == PROSE
     chart = next(e for e in seen if isinstance(e, events.Chart))
     assert chart.spec["dataset"]["source"][0]["region"] == "NA"
     assert chart.spec["series"][0]["type"] == "bar"
     assert chart.title == "Q3 revenue by region"
-    # close-out call must carry tools= (history contains tool_use blocks)
+    # the mapping close-out call carries tools= (history has tool_use blocks)
     assert "tools" in type(client).calls[-1]
 
 

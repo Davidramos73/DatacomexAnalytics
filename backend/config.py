@@ -23,6 +23,11 @@ _DEFAULT_MODEL = {
 LLM_MODEL = os.environ.get("LLM_MODEL", _DEFAULT_MODEL)
 DATA_AGENT_MODEL = os.environ.get("DATA_AGENT_MODEL", LLM_MODEL)
 
+# Reasoning budget for OpenAI-compatible providers: "low" | "medium" | "high"
+# (empty string = don't send the param). DeepSeek V4 burns a lot of thinking
+# tokens by default; "low" is plenty for SQL + chart choices.
+LLM_REASONING_EFFORT = os.environ.get("LLM_REASONING_EFFORT", "low")
+
 MAX_AGENT_ITERS = int(os.environ.get("MAX_AGENT_ITERS", "6"))
 SQL_MAX_ROWS = int(os.environ.get("SQL_MAX_ROWS", "500"))
 SQL_TIMEOUT_S = float(os.environ.get("SQL_TIMEOUT_S", "10"))

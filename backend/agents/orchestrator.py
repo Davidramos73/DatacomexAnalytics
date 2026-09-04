@@ -44,13 +44,16 @@ _QUERY_DATA_TOOL = {
     },
 }
 
+# The prose answer streams separately; this call only picks the chart.
 # Flat, no nested objects — models follow this far more reliably in JSON mode.
-_RESPONSE_SCHEMA = {
+_CHART_SCHEMA = {
     "type": "object",
     "properties": {
-        "answer": {"type": "string"},
-        "chart_title": {"type": "string"},
-        "chart_meta": {"type": "string"},
+        "chart_title": {"type": "string", "description": "a short plain-text title"},
+        "chart_meta": {
+            "type": "string",
+            "description": "one short plain-text line about the chart (a string, not an object)",
+        },
         "chart_type": {"type": "string", "enum": list(charts.ALLOWED_TYPES)},
         "chart_x": {
             "type": "string",
@@ -67,7 +70,7 @@ _RESPONSE_SCHEMA = {
         },
     },
     "required": [
-        "answer", "chart_title", "chart_meta",
+        "chart_title", "chart_meta",
         "chart_type", "chart_x", "chart_y", "chart_series_by",
     ],
     "additionalProperties": False,
@@ -170,56 +173,78 @@ def run(
         key=lambda t: (_chartability(t[1]), t[0]),
     )[1]
 
-    payload = llm.structured_json(
+    result_ctx = (
+        f"\nResult columns: {dataset.columns}\n"
+        + json.dumps({"rows": dataset.rows[:50]})
+    )
+
+    # 1. Stream the prose answer as it is generated.
+    answer = ""
+    for piece in llm.stream_text(
         model=LLM_MODEL,
         system=_SYSTEM,
         messages=agent.messages
         + [
             {
                 "role": "user",
-                "content": (
-                    "Now give your final answer and the chart mapping. This is the "
-                    "ONLY result being charted - chart_x, chart_y and chart_series_by "
-                    "must be exact column names from it; ignore columns from any "
-                    "earlier query.\n"
-                    f"columns: {dataset.columns}\n"
-                    + json.dumps({"rows": dataset.rows[:50]})
-                ),
+                "content": "Explain what this result shows in 1-3 short sentences of "
+                "plain prose. No JSON, no markdown, no chart." + result_ctx,
+            }
+        ],
+    ):
+        answer += piece
+        sink(events.Delta(text=piece))
+    answer = answer.strip()
+
+    # 2. Small structured call: just the chart mapping.
+    sink(events.Step(label="chart.render", detail="echarts v5"))
+    mapping = llm.structured_json(
+        model=LLM_MODEL,
+        system=_SYSTEM,
+        messages=agent.messages
+        + [
+            {
+                "role": "user",
+                "content": "Choose the chart for this result. chart_x, chart_y and "
+                "chart_series_by must be exact column names from it; ignore columns "
+                "from any earlier query." + result_ctx,
             }
         ],
         tools=[_QUERY_DATA_TOOL],
-        schema=_RESPONSE_SCHEMA,
-        schema_name="chart_response",
+        schema=_CHART_SCHEMA,
+        schema_name="chart_mapping",
     )
-    # Some models return these as objects/numbers; the UI wants plain strings.
-    for key in ("answer", "chart_title", "chart_meta"):
-        val = payload.get(key)
-        if val is None:
-            payload[key] = ""
-        elif not isinstance(val, str):
-            payload[key] = json.dumps(val) if isinstance(val, (dict, list)) else str(val)
+    for key in ("chart_title", "chart_meta"):
+        val = mapping.get(key)
+        if not val:
+            mapping[key] = ""
+        elif isinstance(val, str):
+            mapping[key] = val
+        elif isinstance(val, dict):
+            mapping[key] = ", ".join(str(v) for v in val.values())
+        else:
+            mapping[key] = str(val)
 
     chart = {
-        "chart_type": payload.get("chart_type"),
-        "x": payload.get("chart_x"),
-        "y": payload.get("chart_y"),
-        "series_by": payload.get("chart_series_by"),
+        "chart_type": mapping.get("chart_type"),
+        "x": mapping.get("chart_x"),
+        "y": mapping.get("chart_y"),
+        "series_by": mapping.get("chart_series_by"),
     }
 
-    sink(events.Step(label="chart.render", detail="echarts v5"))
     try:
         spec = charts.build_option(chart, dataset.columns, dataset.rows)
     except charts.ChartError as exc:
-        sink(events.Text(text=payload.get("answer", "")))
+        sink(events.Text(text=answer))
         sink(events.ErrorEvent(message=f"Could not build chart: {exc}"))
         sink(events.Done(seconds=round(time.monotonic() - started, 1)))
         return
 
-    sink(events.Text(text=payload["answer"]))
+    sink(events.Text(text=answer))
     sink(
         events.Chart(
-            title=payload["chart_title"],
-            meta=payload["chart_meta"],
+            title=mapping["chart_title"],
+            meta=mapping["chart_meta"],
             spec=spec,
             data={"columns": dataset.columns, "rows": dataset.rows},
         )

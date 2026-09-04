@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from typing import Callable
+from typing import Callable, Iterator
 
 import backend.config as config
 from backend import events
@@ -23,6 +23,11 @@ def _max_output_tokens() -> int:
     if config.LLM_PROVIDER == "deepseek":
         return min(MAX_TOKENS, 8000)
     return MAX_TOKENS
+
+
+def _reasoning_kw() -> dict:
+    effort = config.LLM_REASONING_EFFORT
+    return {"reasoning_effort": effort} if effort else {}
 
 
 def get_client():
@@ -226,6 +231,7 @@ def _run_agent_openai(
             messages=msgs,
             tools=oai_tools,
             max_tokens=_max_output_tokens(),
+            **_reasoning_kw(),
         )
         msg = response.choices[0].message
         msgs.append(_assistant_entry(msg))
@@ -333,6 +339,7 @@ def structured_json(
                 messages=msgs,
                 max_tokens=_max_output_tokens(),
                 response_format=response_format,
+                **_reasoning_kw(),
             ).choices[0]
             content = choice.message.content
             if content:
@@ -356,3 +363,38 @@ def structured_json(
     )
     text = next(b.text for b in response.content if b.type == "text")
     return json.loads(text)
+
+
+def stream_text(*, model: str, system: str, messages: list[dict]) -> Iterator[str]:
+    """Yield the model's plain-text answer in fragments as it is generated.
+
+    Like `structured_json`, `messages` already carries a system message on the
+    OpenAI path; the Anthropic path takes `system` separately.
+    """
+    client = get_client()
+
+    if _is_openai_compatible():
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=_max_output_tokens(),
+            stream=True,
+            **_reasoning_kw(),
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            piece = chunk.choices[0].delta.content
+            if piece:
+                yield piece
+        return
+
+    with client.messages.stream(
+        model=model,
+        max_tokens=_max_output_tokens(),
+        system=system,
+        messages=messages,
+    ) as stream:
+        for piece in stream.text_stream:
+            if piece:
+                yield piece
