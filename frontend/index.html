@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lumen Analyst</title>
+<title>Analista de Calzado · DataComex</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/theme/macarons.js"></script>
@@ -127,7 +127,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sb-top">
       <div class="sb-logo"><i></i></div>
-      <div class="sb-name">Lumen Analyst</div>
+      <div class="sb-name">Calzado · DataComex</div>
       <button class="icon-btn" id="collapseBtn" title="Toggle sidebar">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="2"></rect><line x1="6.5" y1="3" x2="6.5" y2="13"></line></svg>
       </button>
@@ -149,7 +149,7 @@
   <main>
     <header>
       <div class="title" id="headerTitle">New chat</div>
-      <div class="badge"><span></span>warehouse · read only</div>
+      <div class="badge"><span></span>DataComex · TARIC 64</div>
       <div class="grow"></div>
       <select class="theme-sel" id="themeSel" title="Chart theme"></select>
       <div class="engine">echarts v5</div>
@@ -160,7 +160,7 @@
         <textarea id="draft" rows="1" placeholder="Ask about the data…"></textarea>
         <button class="send" id="send">↑</button>
       </div>
-      <div class="hint">Agent runs read-only SQL and returns ECharts options. Verify figures before sharing.</div>
+      <div class="hint">Comercio exterior de calzado (cap. 64). Datos sintéticos · <a href="/reportes.html" style="color:#3a53c9">ver panel de reportes</a></div>
     </div>
   </main>
 </div>
@@ -223,7 +223,7 @@ const chatList = $("#chatList"), headerTitle = $("#headerTitle"), searchInput = 
 
 /* ---------- store (localStorage) ---------- */
 const STORAGE_KEY = "lumen.v1";
-const PROMPTS = ["Revenue by region", "Monthly revenue trend", "Discount vs margin"];
+const PROMPTS = ["Importaciones por país", "Evolución del calzado deportivo", "Precio medio €/kg"];
 const MAX_CHATS = 40;          // keep the newest N chats
 const MAX_HISTORY_TURNS = 6;   // prior user/assistant turns sent for context
 
@@ -398,8 +398,8 @@ function renderThread() {
 
   if (!chat.messages.length) {
     const e = el("div", "empty");
-    e.appendChild(el("h1", null, "What should we look at?"));
-    e.appendChild(el("p", null, "Ask about revenue, discounting or margin. Charts come back as ECharts options, rendered inline."));
+    e.appendChild(el("h1", null, "¿Qué miramos del calzado?"));
+    e.appendChild(el("p", null, "Pregunta por importaciones, exportaciones, socios comerciales, mix de producto o precios de calzado."));
     const chips = el("div", "chips");
     PROMPTS.forEach(p => {
       const b = el("button", null, esc(p));

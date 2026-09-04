@@ -9,11 +9,17 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import backend.config as config
 from backend import events
-from backend.agents import orchestrator
+from backend.agents import orchestrator, orchestrator_footwear
 from backend.routers import reports
 
-orchestrator_run = orchestrator.run  # indirection for tests
+# indirection for tests; pick the chat domain at import time
+orchestrator_run = (
+    orchestrator_footwear.run
+    if config.CHAT_DOMAIN == "footwear"
+    else orchestrator.run
+)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 
