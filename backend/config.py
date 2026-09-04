@@ -55,6 +55,9 @@ AUTH_DB_PATH = Path(
     )
 )
 
+# --- ingest (real DataComex data, offline job) ------------------------------ #
+DATA_COMEX_TOKEN = os.environ.get("DATA_COMEX_TOKEN", "")
+
 WAREHOUSE_PATH = Path(
     os.environ.get(
         "WAREHOUSE_PATH",
