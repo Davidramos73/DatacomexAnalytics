@@ -278,7 +278,18 @@ const chatList = $("#chatList"), headerTitle = $("#headerTitle"), searchInput = 
 
 /* ---------- store (localStorage) ---------- */
 const STORAGE_KEY = "lumen.v1";
-const PROMPTS = ["Importaciones por país", "Evolución del calzado deportivo", "Precio medio €/kg"];
+const PROMPTS = [
+  "¿Cómo ha evolucionado la importación de calzado en los últimos 2 años?",
+  "Muéstrame la evolución de las exportaciones de calzado de cuero desde 2020",
+  "¿Quiénes son los principales países de origen de las importaciones de calzado?",
+  "¿A qué países exportamos más calzado?",
+  "Top 10 proveedores de calzado deportivo",
+  "¿Qué tipo de calzado importamos más, deportivo o de cuero?",
+  "¿Cuál es el precio medio por kilo del calzado que importamos de China?",
+  "¿Ha subido el precio medio del calzado de cuero en el último año?",
+  "¿Cuál es la balanza comercial de calzado de España?",
+  "¿Cuánto calzado deportivo importamos de Vietnam?",
+];
 const MAX_CHATS = 40;          // keep the newest N chats
 const MAX_HISTORY_TURNS = 6;   // prior user/assistant turns sent for context
 
