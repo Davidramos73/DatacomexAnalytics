@@ -11,12 +11,14 @@ from pydantic import BaseModel
 
 from backend import events
 from backend.agents import orchestrator
+from backend.routers import reports
 
 orchestrator_run = orchestrator.run  # indirection for tests
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 
 app = FastAPI(title="Agent Chat Analytics")
+app.include_router(reports.router)
 
 
 class Turn(BaseModel):

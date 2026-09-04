@@ -57,6 +57,29 @@ def resolve_taric(con, term: str) -> str | None:
     return row[0] if row else None
 
 
+def filter_options(con) -> dict:
+    """Values to populate the report page's selectors."""
+    periods = [
+        r[0] for r in con.execute(
+            "SELECT DISTINCT period FROM datacomex.trade_flows ORDER BY period"
+        ).fetchall()
+    ]
+    headings = [
+        {"code": r[0], "description": r[1]}
+        for r in con.execute(
+            "SELECT code, description FROM datacomex.taric_tree "
+            "WHERE level = 4 ORDER BY code"
+        ).fetchall()
+    ]
+    countries = [
+        r[0] for r in con.execute(
+            "SELECT country_name FROM datacomex.trade_flows "
+            "GROUP BY country_name ORDER BY SUM(value_eur) DESC LIMIT 15"
+        ).fetchall()
+    ]
+    return {"periods": periods, "headings": headings, "countries": countries}
+
+
 def evolution(con, *, flow: str, heading: str = "64", months: int = 24) -> dict:
     """Monthly value trend for a flow + TARIC scope, with a year-on-year KPI."""
     pred, param = _scope(heading)

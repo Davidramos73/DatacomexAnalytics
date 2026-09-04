@@ -167,3 +167,24 @@ def _ascii(s: str) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", s.lower()) if not unicodedata.combining(c)
     )
+
+
+# --------------------------------------------------------------------------- #
+# filter_options
+# --------------------------------------------------------------------------- #
+def test_filter_options_lists_periods_headings_and_top_countries(con):
+    _insert(
+        con,
+        _flow(country_code="CHN", country_name="China", period="2024-01",
+              year=2024, month=1, value_eur=90_000_000),
+        _flow(country_code="VNM", country_name="Vietnam", period="2024-02",
+              year=2024, month=2, value_eur=10_000_000),
+    )
+    out = footwear.filter_options(con)
+
+    assert out["periods"] == ["2024-01", "2024-02"]
+    assert {h["code"] for h in out["headings"]} == {
+        "6401", "6402", "6403", "6404", "6405", "6406"
+    }
+    assert out["headings"][0]["description"]  # non-empty label
+    assert out["countries"][0] == "China"  # ordered by value desc
