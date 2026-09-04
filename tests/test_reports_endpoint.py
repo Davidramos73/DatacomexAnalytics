@@ -57,6 +57,34 @@ def test_filter_options_endpoint(client):
     assert r.json()["periods"] == ["2024-01", "2024-02"]
 
 
+def test_product_mix_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/product-mix", params={"flow": "import"}
+    )
+    assert r.status_code == 200
+    assert r.json()["widget"] == "product_mix"
+    assert r.json()["echarts"]["series"][0]["type"] == "pie"
+
+
+def test_avg_price_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/avg-price", params={"flow": "import", "months": 12}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["widget"] == "avg_price"
+    # 2024-01: (50M + 20M) / (4M + 2M) kg = 11.67 €/kg ; 2024-02: 60/5 = 12.0
+    assert body["echarts"]["series"][0]["data"] == [11.67, 12.0]
+
+
+def test_balance_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/balance", params={"months": 12}
+    )
+    assert r.status_code == 200
+    assert r.json()["widget"] == "trade_balance"
+
+
 def test_reports_page_is_served(client):
     r = client.get("/reportes.html")
     assert r.status_code == 200

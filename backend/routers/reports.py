@@ -57,3 +57,37 @@ def countries(
         period_to=period_to,
         top_n=top_n,
     )
+
+
+@router.get("/product-mix")
+def product_mix(
+    flow: str,
+    period_from: str | None = None,
+    period_to: str | None = None,
+    con=Depends(get_footwear_con),
+) -> dict:
+    return footwear.product_mix(
+        con, flow=flow.upper(), period_from=period_from, period_to=period_to
+    )
+
+
+@router.get("/avg-price")
+def avg_price(
+    flow: str,
+    taric: str = "64",
+    country: str | None = None,
+    months: int = 24,
+    con=Depends(get_footwear_con),
+) -> dict:
+    return footwear.avg_price(
+        con, flow=flow.upper(), heading=taric, country=country, months=months
+    )
+
+
+@router.get("/balance")
+def balance(
+    taric: str = "64",
+    months: int = 24,
+    con=Depends(get_footwear_con),
+) -> dict:
+    return footwear.balance(con, heading=taric, months=months)

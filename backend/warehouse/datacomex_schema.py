@@ -51,6 +51,16 @@ HEADINGS = {
     "6406": ("Partes de calzado; plantillas, taloneras; polainas y artículos análogos", False),
 }
 
+# short label for legends / pie slices
+SHORT_LABEL = {
+    "6401": "6401 · impermeable",
+    "6402": "6402 · caucho/plástico",
+    "6403": "6403 · cuero",
+    "6404": "6404 · textil",
+    "6405": "6405 · otros",
+    "6406": "6406 · partes",
+}
+
 # level-6 TARIC codes per heading (a representative subset)
 SUBHEADINGS = {
     "6401": ["640110", "640192", "640199"],

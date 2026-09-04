@@ -6,6 +6,8 @@ never diverge.
 """
 from __future__ import annotations
 
+from backend.warehouse.datacomex_schema import SHORT_LABEL
+
 _FLOW_LABEL = {"IMPORT": "Importaciones", "EXPORT": "Exportaciones"}
 
 
@@ -199,4 +201,169 @@ def country_ranking(
             {"label": "Cuota del líder", "value": f"{leader_share:.1f}%", "tone": "neutral"}
         ],
         "meta": {"unit": "EUR", "granularity": "range"},
+    }
+
+
+def _period_range(where: str, args: list, period_from, period_to):
+    if period_from:
+        where += " AND period >= ?"
+        args.append(period_from)
+    if period_to:
+        where += " AND period <= ?"
+        args.append(period_to)
+    return where, args
+
+
+def product_mix(
+    con, *, flow: str, period_from: str | None = None, period_to: str | None = None
+) -> dict:
+    """Share of traded value by TARIC heading (6401–6406) — a donut."""
+    where, args = _period_range("flow = ? AND chapter = '64'", [flow], period_from, period_to)
+    rows = con.execute(
+        f"""SELECT heading, SUM(value_eur) FROM datacomex.trade_flows
+            WHERE {where} GROUP BY heading ORDER BY heading""",
+        args,
+    ).fetchall()
+
+    total = sum(r[1] for r in rows) or 0
+    data = [
+        {"name": SHORT_LABEL.get(h, h), "value": round(v / 1e6, 2)} for h, v in rows
+    ]
+    top_share = max((v for _, v in rows), default=0) / total * 100.0 if total else 0.0
+
+    return {
+        "widget": "product_mix",
+        "title": f"{_FLOW_LABEL.get(flow, flow)} de calzado por tipo de producto",
+        "echarts": {
+            "tooltip": {"trigger": "item", "formatter": "{b}: {c} M€ ({d}%)"},
+            "legend": {"bottom": 0},
+            "series": [
+                {
+                    "type": "pie",
+                    "radius": ["40%", "70%"],
+                    "data": data,
+                    "label": {"formatter": "{b}\n{d}%"},
+                }
+            ],
+        },
+        "kpis": [
+            {"label": "Cuota del tipo dominante", "value": f"{top_share:.1f}%", "tone": "neutral"}
+        ],
+        "meta": {"unit": "EUR", "granularity": "range"},
+    }
+
+
+def avg_price(
+    con,
+    *,
+    flow: str,
+    heading: str = "64",
+    country: str | None = None,
+    months: int = 24,
+) -> dict:
+    """Implied unit price (€/kg) over time; null where a period has no weight."""
+    pred, param = _scope(heading)
+    where = f"flow = ? AND {pred}"
+    args: list = [flow, param]
+    if country:
+        where += " AND country_name = ?"
+        args.append(country)
+
+    max_idx = con.execute(
+        f"SELECT max(year * 12 + month) FROM datacomex.trade_flows WHERE {where}",
+        args,
+    ).fetchone()[0]
+
+    rows = []
+    if max_idx is not None:
+        rows = con.execute(
+            f"""
+            SELECT period,
+                   SUM(value_eur)  AS v,
+                   SUM(weight_kg)  AS w
+            FROM datacomex.trade_flows
+            WHERE {where} AND year * 12 + month > ? - ?
+            GROUP BY period ORDER BY period
+            """,
+            args + [max_idx, months],
+        ).fetchall()
+
+    periods = [r[0] for r in rows]
+    prices = [round(r[1] / r[2], 2) if r[2] else None for r in rows]
+
+    priced = [p for p in prices if p is not None]
+    kpi = _pct_kpi(
+        "Var. precio (12m)",
+        priced[-1] if priced else 0.0,
+        priced[0] if len(priced) > 1 else 0.0,
+    )
+
+    return {
+        "widget": "avg_price",
+        "title": f"Precio medio {_FLOW_LABEL.get(flow, flow).lower()} de calzado (€/kg)",
+        "echarts": {
+            "tooltip": {"trigger": "axis"},
+            "xAxis": {"type": "category", "data": periods},
+            "yAxis": {"type": "value", "name": "€/kg"},
+            "series": [
+                {"name": "€/kg", "type": "line", "smooth": True, "connectNulls": False,
+                 "data": prices}
+            ],
+        },
+        "kpis": [kpi],
+        "meta": {"unit": "EUR/kg", "granularity": "monthly"},
+    }
+
+
+def balance(con, *, heading: str = "64", months: int = 24) -> dict:
+    """Monthly trade balance (exports − imports) plus its running total."""
+    pred, param = _scope(heading)
+    where = pred
+    args: list = [param]
+
+    max_idx = con.execute(
+        f"SELECT max(year * 12 + month) FROM datacomex.trade_flows WHERE {where}",
+        args,
+    ).fetchone()[0]
+
+    rows = []
+    if max_idx is not None:
+        rows = con.execute(
+            f"""
+            SELECT period,
+                   SUM(CASE WHEN flow = 'EXPORT' THEN value_eur ELSE -value_eur END) AS saldo
+            FROM datacomex.trade_flows
+            WHERE {where} AND year * 12 + month > ? - ?
+            GROUP BY period ORDER BY period
+            """,
+            args + [max_idx, months],
+        ).fetchall()
+
+    periods = [r[0] for r in rows]
+    saldo = [round(r[1] / 1e6, 2) for r in rows]
+    cumulative, running = [], 0.0
+    for s in saldo:
+        running = round(running + s, 2)
+        cumulative.append(running)
+
+    total = cumulative[-1] if cumulative else 0.0
+    tone = "positive" if total > 0 else "negative" if total < 0 else "neutral"
+
+    return {
+        "widget": "trade_balance",
+        "title": "Saldo comercial de calzado (M€)",
+        "echarts": {
+            "tooltip": {"trigger": "axis"},
+            "legend": {"top": 0},
+            "xAxis": {"type": "category", "data": periods},
+            "yAxis": {"type": "value", "name": "M€"},
+            "series": [
+                {"name": "Saldo", "type": "bar", "data": saldo},
+                {"name": "Acumulado", "type": "line", "smooth": True, "data": cumulative},
+            ],
+        },
+        "kpis": [
+            {"label": "Saldo acumulado", "value": f"{total:+.1f} M€", "tone": tone}
+        ],
+        "meta": {"unit": "EUR", "granularity": "monthly"},
     }

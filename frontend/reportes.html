@@ -66,6 +66,12 @@ const WIDGETS = [
     url: f => `/api/v1/reports/footwear/evolution?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
   { key: "countries", title: "Principales socios (M€)", half: false,
     url: f => `/api/v1/reports/footwear/countries?flow=${f.flow}&taric=${f.taric}&top_n=10` },
+  { key: "mix", title: "Mix de producto", half: true,
+    url: f => `/api/v1/reports/footwear/product-mix?flow=${f.flow}` },
+  { key: "price", title: "Precio medio (€/kg)", half: true,
+    url: f => `/api/v1/reports/footwear/avg-price?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
+  { key: "balance", title: "Saldo comercial (M€)", half: false,
+    url: f => `/api/v1/reports/footwear/balance?taric=${f.taric}&months=${f.months}` },
 ];
 
 const charts = {};

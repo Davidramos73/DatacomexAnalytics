@@ -188,3 +188,73 @@ def test_filter_options_lists_periods_headings_and_top_countries(con):
     }
     assert out["headings"][0]["description"]  # non-empty label
     assert out["countries"][0] == "China"  # ordered by value desc
+
+
+# --------------------------------------------------------------------------- #
+# product_mix
+# --------------------------------------------------------------------------- #
+def test_product_mix_donut_by_heading(con):
+    _insert(
+        con,
+        _flow(heading="6404", taric_code="640411", value_eur=60_000_000),
+        _flow(heading="6403", taric_code="640312", value_eur=30_000_000),
+        _flow(heading="6402", taric_code="640212", value_eur=10_000_000),
+    )
+    out = footwear.product_mix(con, flow="IMPORT")
+
+    assert out["widget"] == "product_mix"
+    series = out["echarts"]["series"][0]
+    assert series["type"] == "pie"
+    by_name = {d["name"]: d["value"] for d in series["data"]}
+    assert by_name["6404 · textil"] == 60.0
+    assert by_name["6403 · cuero"] == 30.0
+    kpi = next(k for k in out["kpis"] if "cuota" in _ascii(k["label"]))
+    assert kpi["value"] == "60.0%"  # dominant heading
+
+
+# --------------------------------------------------------------------------- #
+# avg_price
+# --------------------------------------------------------------------------- #
+def test_avg_price_is_value_over_weight_per_period(con):
+    _insert(
+        con,
+        _flow(period="2024-01", year=2024, month=1,
+              value_eur=20_000_000, weight_kg=1_000_000),   # 20 €/kg
+        _flow(period="2024-02", year=2024, month=2,
+              value_eur=30_000_000, weight_kg=1_000_000),   # 30 €/kg
+    )
+    out = footwear.avg_price(con, flow="IMPORT", months=12)
+
+    assert out["widget"] == "avg_price"
+    assert out["echarts"]["series"][0]["data"] == [20.0, 30.0]
+    assert out["echarts"]["yAxis"]["name"] == "€/kg"
+
+
+def test_avg_price_guards_against_zero_weight(con):
+    _insert(
+        con,
+        _flow(period="2024-01", year=2024, month=1,
+              value_eur=5_000_000, weight_kg=0),
+    )
+    out = footwear.avg_price(con, flow="IMPORT", months=12)
+    assert out["echarts"]["series"][0]["data"] == [None]
+
+
+# --------------------------------------------------------------------------- #
+# balance
+# --------------------------------------------------------------------------- #
+def test_balance_monthly_saldo_and_cumulative(con):
+    _insert(
+        con,
+        _flow(flow="EXPORT", period="2024-01", year=2024, month=1, value_eur=30_000_000),
+        _flow(flow="IMPORT", period="2024-01", year=2024, month=1, value_eur=10_000_000),
+        _flow(flow="EXPORT", period="2024-02", year=2024, month=2, value_eur=5_000_000),
+        _flow(flow="IMPORT", period="2024-02", year=2024, month=2, value_eur=25_000_000),
+    )
+    out = footwear.balance(con, months=12)
+
+    assert out["widget"] == "trade_balance"
+    series = {s["name"]: s["data"] for s in out["echarts"]["series"]}
+    assert series["Saldo"] == [20.0, -20.0]          # 30-10, 5-25
+    assert series["Acumulado"] == [20.0, 0.0]        # running sum
+    assert {s["type"] for s in out["echarts"]["series"]} == {"bar", "line"}
