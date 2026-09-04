@@ -57,6 +57,15 @@ AUTH_DB_PATH = Path(
 
 # --- ingest (real DataComex data, offline job) ------------------------------ #
 DATA_COMEX_TOKEN = os.environ.get("DATA_COMEX_TOKEN", "")
+# Where the footwear (DataComex) warehouse the app reads lives. In prod, point
+# this at the same persistent volume as AUTH_DB_PATH so `build_warehouse`
+# refreshes survive redeploys without rebuilding the image.
+DATACOMEX_PATH = Path(
+    os.environ.get(
+        "DATACOMEX_PATH",
+        str(Path(__file__).parent / "warehouse" / "footwear.duckdb"),
+    )
+)
 
 WAREHOUSE_PATH = Path(
     os.environ.get(

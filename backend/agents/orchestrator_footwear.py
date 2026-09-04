@@ -11,11 +11,11 @@ import time
 
 import duckdb
 
+import backend.config as config
 from backend import events
 from backend.agents import llm, tools_footwear
 from backend.agents.orchestrator import clean_history
 from backend.config import LLM_MODEL
-from backend.warehouse.datacomex_seed import DATACOMEX_PATH
 
 _SYSTEM = """\
 Eres analista de comercio exterior de la industria española del calzado. Respondes
@@ -36,7 +36,7 @@ Reglas:
 
 
 def _default_con():
-    return duckdb.connect(str(DATACOMEX_PATH), read_only=True)
+    return duckdb.connect(str(config.DATACOMEX_PATH), read_only=True)
 
 
 def _step_label(name: str, tool_input: dict) -> events.Step:

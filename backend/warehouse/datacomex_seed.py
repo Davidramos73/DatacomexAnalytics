@@ -15,6 +15,7 @@ from pathlib import Path
 
 import duckdb
 
+import backend.config as config
 from backend.config import RANDOM_SEED
 from backend.warehouse.datacomex_schema import (
     HEADINGS,
@@ -24,7 +25,9 @@ from backend.warehouse.datacomex_schema import (
 
 # NB: the file stem must differ from the schema name ("datacomex"), otherwise
 # DuckDB can't tell `datacomex.table` (catalog) from `datacomex.table` (schema).
-DATACOMEX_PATH = Path(__file__).parent / "footwear.duckdb"
+# Kept as an alias for backward compatibility; config.DATACOMEX_PATH is the
+# source of truth (env-overridable, shared with build_warehouse.py).
+DATACOMEX_PATH = config.DATACOMEX_PATH
 
 _MONTHS = 36
 _END = (2025, 12)  # last (year, month); provisional

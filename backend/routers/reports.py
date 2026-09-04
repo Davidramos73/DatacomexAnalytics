@@ -9,14 +9,14 @@ from __future__ import annotations
 import duckdb
 from fastapi import APIRouter, Depends
 
+import backend.config as config
 from backend.services import footwear
-from backend.warehouse.datacomex_seed import DATACOMEX_PATH
 
 router = APIRouter(prefix="/api/v1/reports/footwear", tags=["footwear"])
 
 
 def get_footwear_con():
-    con = duckdb.connect(str(DATACOMEX_PATH), read_only=True)
+    con = duckdb.connect(str(config.DATACOMEX_PATH), read_only=True)
     try:
         yield con
     finally:

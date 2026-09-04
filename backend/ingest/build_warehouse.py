@@ -116,11 +116,7 @@ def main() -> None:
     if not config.DATA_COMEX_TOKEN:
         raise SystemExit("DATA_COMEX_TOKEN is not set")
     client = DataComexClient(token=config.DATA_COMEX_TOKEN)
-    target = (
-        Path(args.path)
-        if args.path
-        else config.AUTH_DB_PATH.parent / "footwear.duckdb"
-    )
+    target = Path(args.path) if args.path else config.DATACOMEX_PATH
     build(path=target, client=client, from_year=args.from_year)
     print(f"Warehouse built at {target}")
 
