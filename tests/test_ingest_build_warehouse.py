@@ -22,6 +22,7 @@ class _FakeClient:
 
 
 TREE = [
+    {"Taric": "01", "TaricPadre": "", "Nombre": "01 ANIMALES VIVOS", "Nivel": "1"},  # other chapter, skip
     {"Taric": "64", "TaricPadre": "", "Nombre": "64 CALZADO; SUS PARTES", "Nivel": "1"},
     {"Taric": "6404", "TaricPadre": "64", "Nombre": "6404 Calzado textil", "Nivel": "2"},
     {"Taric": "640411", "TaricPadre": "6404", "Nombre": "640411 detalle", "Nivel": "3"},
@@ -59,10 +60,11 @@ def test_build_writes_taric_tree_and_trade_flows(tmp_path):
 
     con = duckdb.connect(str(path), read_only=True)
     try:
-        # only numeric taric codes make it into the tree
+        # only numeric, chapter-64 taric codes make it into the tree
         codes = {r[0] for r in con.execute(
             "SELECT code FROM datacomex.taric_tree").fetchall()}
         assert codes == {"64", "6404", "640411"}
+        assert "01" not in codes
         assert con.execute(
             "SELECT level FROM datacomex.taric_tree WHERE code='640411'"
         ).fetchone()[0] == 6

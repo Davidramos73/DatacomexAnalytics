@@ -31,11 +31,13 @@ def _select_periods(raw_periods: list[dict], from_year: int) -> list[str]:
 
 
 def _tree_rows(raw_tree: list[dict]) -> list[tuple]:
+    """ObtenerTarics returns the *entire* nomenclature (all ~99 chapters);
+    keep only numeric, chapter-64 (footwear) codes."""
     rows = []
     for t in raw_tree:
         code = t["Taric"]
-        if not code.isdigit():
-            continue  # skip special codes: 64CC / 64MM / 64PP / 64SS / 6499...
+        if not code.isdigit() or not code.startswith("64"):
+            continue  # other chapters, or special codes: 64CC/64MM/64PP/64SS...
         parent = t.get("TaricPadre") or None
         rows.append((code, parent, len(code), t.get("Nombre", code)))
     return rows
