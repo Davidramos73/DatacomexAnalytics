@@ -32,6 +32,15 @@ _HEADING = {
 _MONTHS = {"type": "integer", "description": "Meses hacia atrás (por defecto 24)"}
 
 
+def _chart_type_field(options: str, default: str) -> dict:
+    return {
+        "type": "string",
+        "enum": options.split("|"),
+        "description": f"Tipo de gráfico ({options}). Por defecto {default}. "
+        "Úsalo si el usuario pide explícitamente otro formato.",
+    }
+
+
 def tool_defs() -> list[dict]:
     return [
         {
@@ -54,7 +63,10 @@ def tool_defs() -> list[dict]:
             "'cómo va'.",
             "input_schema": {
                 "type": "object",
-                "properties": {"flow": _FLOW, "heading": _HEADING, "months": _MONTHS},
+                "properties": {
+                    "flow": _FLOW, "heading": _HEADING, "months": _MONTHS,
+                    "chart_type": _chart_type_field("line|bar", "line"),
+                },
                 "required": ["flow"],
                 "additionalProperties": False,
             },
@@ -69,6 +81,7 @@ def tool_defs() -> list[dict]:
                     "flow": _FLOW,
                     "heading": _HEADING,
                     "top_n": {"type": "integer", "description": "por defecto 10"},
+                    "chart_type": _chart_type_field("bar|pie", "bar"),
                 },
                 "required": ["flow"],
                 "additionalProperties": False,
@@ -80,7 +93,10 @@ def tool_defs() -> list[dict]:
             "Para 'qué tipo de calzado', 'mix de producto'.",
             "input_schema": {
                 "type": "object",
-                "properties": {"flow": _FLOW},
+                "properties": {
+                    "flow": _FLOW,
+                    "chart_type": _chart_type_field("pie|bar", "pie"),
+                },
                 "required": ["flow"],
                 "additionalProperties": False,
             },
@@ -96,6 +112,7 @@ def tool_defs() -> list[dict]:
                     "heading": _HEADING,
                     "country": {"type": "string"},
                     "months": _MONTHS,
+                    "chart_type": _chart_type_field("line|bar", "line"),
                 },
                 "required": ["flow"],
                 "additionalProperties": False,
@@ -107,7 +124,10 @@ def tool_defs() -> list[dict]:
             "acumulado. Para 'balanza', 'saldo', 'déficit/superávit'.",
             "input_schema": {
                 "type": "object",
-                "properties": {"heading": _HEADING, "months": _MONTHS},
+                "properties": {
+                    "heading": _HEADING, "months": _MONTHS,
+                    "chart_type": _chart_type_field("bar|line", "bar"),
+                },
                 "required": [],
                 "additionalProperties": False,
             },
@@ -123,26 +143,32 @@ def handlers(con) -> dict:
         "resolve_footwear_product": lambda term: _dump(
             {"heading": footwear.resolve_taric(con, term)}
         ),
-        "footwear_market_overview": lambda flow, heading="64", months=24: _dump(
+        "footwear_market_overview": lambda flow, heading="64", months=24,
+        chart_type=None: _dump(
             footwear.evolution(
-                con, flow=flow.upper(), heading=heading, months=int(months)
+                con, flow=flow.upper(), heading=heading, months=int(months),
+                chart_type=chart_type,
             )
         ),
-        "footwear_top_partners": lambda flow, heading="64", top_n=10: _dump(
+        "footwear_top_partners": lambda flow, heading="64", top_n=10,
+        chart_type=None: _dump(
             footwear.country_ranking(
-                con, flow=flow.upper(), heading=heading, top_n=int(top_n)
+                con, flow=flow.upper(), heading=heading, top_n=int(top_n),
+                chart_type=chart_type,
             )
         ),
-        "footwear_product_mix": lambda flow: _dump(
-            footwear.product_mix(con, flow=flow.upper())
+        "footwear_product_mix": lambda flow, chart_type=None: _dump(
+            footwear.product_mix(con, flow=flow.upper(), chart_type=chart_type)
         ),
-        "footwear_avg_price": lambda flow, heading="64", country=None, months=24: _dump(
+        "footwear_avg_price": lambda flow, heading="64", country=None, months=24,
+        chart_type=None: _dump(
             footwear.avg_price(
                 con, flow=flow.upper(), heading=heading, country=country,
-                months=int(months),
+                months=int(months), chart_type=chart_type,
             )
         ),
-        "footwear_trade_balance": lambda heading="64", months=24: _dump(
-            footwear.balance(con, heading=heading, months=int(months))
+        "footwear_trade_balance": lambda heading="64", months=24, chart_type=None: _dump(
+            footwear.balance(con, heading=heading, months=int(months),
+                              chart_type=chart_type)
         ),
     }

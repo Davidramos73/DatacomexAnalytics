@@ -119,6 +119,18 @@ def test_evolution_flags_provisional_periods(con):
     assert out["meta"]["is_provisional"] is True
 
 
+def test_evolution_accepts_bar_chart_type(con):
+    _insert(con, _flow(value_eur=1_000_000))
+    out = footwear.evolution(con, flow="IMPORT", chart_type="bar")
+    assert out["echarts"]["series"][0]["type"] == "bar"
+
+
+def test_evolution_falls_back_to_line_for_unknown_chart_type(con):
+    _insert(con, _flow(value_eur=1_000_000))
+    out = footwear.evolution(con, flow="IMPORT", chart_type="scatter")
+    assert out["echarts"]["series"][0]["type"] == "line"
+
+
 # --------------------------------------------------------------------------- #
 # country_ranking
 # --------------------------------------------------------------------------- #
@@ -160,6 +172,25 @@ def test_country_ranking_leader_share_kpi(con):
     out = footwear.country_ranking(con, flow="IMPORT")
     kpi = next(k for k in out["kpis"] if "lider" in _ascii(k["label"]))
     assert kpi["value"] == "80.0%"
+
+
+def test_country_ranking_accepts_pie_chart_type(con):
+    _insert(
+        con,
+        _flow(country_code="CHN", country_name="China", value_eur=80_000_000),
+        _flow(country_code="VNM", country_name="Vietnam", value_eur=20_000_000),
+    )
+    out = footwear.country_ranking(con, flow="IMPORT", chart_type="pie")
+    series = out["echarts"]["series"][0]
+    assert series["type"] == "pie"
+    by_name = {d["name"]: d["value"] for d in series["data"]}
+    assert by_name["China"] == 80.0
+
+
+def test_country_ranking_falls_back_to_bar_for_unknown_chart_type(con):
+    _insert(con, _flow(country_name="China", value_eur=80_000_000))
+    out = footwear.country_ranking(con, flow="IMPORT", chart_type="line")
+    assert out["echarts"]["series"][0]["type"] == "bar"
 
 
 def _ascii(s: str) -> str:
@@ -212,6 +243,20 @@ def test_product_mix_donut_by_heading(con):
     assert kpi["value"] == "60.0%"  # dominant heading
 
 
+def test_product_mix_accepts_bar_chart_type(con):
+    _insert(con, _flow(heading="6404", taric_code="640411", value_eur=60_000_000))
+    out = footwear.product_mix(con, flow="IMPORT", chart_type="bar")
+    series = out["echarts"]["series"][0]
+    assert series["type"] == "bar"
+    assert series["data"] == [60.0]
+
+
+def test_product_mix_falls_back_to_pie_for_unknown_chart_type(con):
+    _insert(con, _flow(heading="6404", taric_code="640411", value_eur=60_000_000))
+    out = footwear.product_mix(con, flow="IMPORT", chart_type="line")
+    assert out["echarts"]["series"][0]["type"] == "pie"
+
+
 # --------------------------------------------------------------------------- #
 # avg_price
 # --------------------------------------------------------------------------- #
@@ -240,6 +285,18 @@ def test_avg_price_guards_against_zero_weight(con):
     assert out["echarts"]["series"][0]["data"] == [None]
 
 
+def test_avg_price_accepts_bar_chart_type(con):
+    _insert(con, _flow(value_eur=20_000_000, weight_kg=1_000_000))
+    out = footwear.avg_price(con, flow="IMPORT", chart_type="bar")
+    assert out["echarts"]["series"][0]["type"] == "bar"
+
+
+def test_avg_price_falls_back_to_line_for_unknown_chart_type(con):
+    _insert(con, _flow(value_eur=20_000_000, weight_kg=1_000_000))
+    out = footwear.avg_price(con, flow="IMPORT", chart_type="pie")
+    assert out["echarts"]["series"][0]["type"] == "line"
+
+
 # --------------------------------------------------------------------------- #
 # balance
 # --------------------------------------------------------------------------- #
@@ -258,3 +315,26 @@ def test_balance_monthly_saldo_and_cumulative(con):
     assert series["Saldo"] == [20.0, -20.0]          # 30-10, 5-25
     assert series["Acumulado"] == [20.0, 0.0]        # running sum
     assert {s["type"] for s in out["echarts"]["series"]} == {"bar", "line"}
+
+
+def test_balance_saldo_accepts_line_chart_type(con):
+    _insert(
+        con,
+        _flow(flow="EXPORT", period="2024-01", year=2024, month=1, value_eur=30_000_000),
+        _flow(flow="IMPORT", period="2024-01", year=2024, month=1, value_eur=10_000_000),
+    )
+    out = footwear.balance(con, chart_type="line")
+    series = {s["name"]: s["type"] for s in out["echarts"]["series"]}
+    assert series["Saldo"] == "line"
+    assert series["Acumulado"] == "line"
+
+
+def test_balance_falls_back_to_bar_for_unknown_chart_type(con):
+    _insert(
+        con,
+        _flow(flow="EXPORT", period="2024-01", year=2024, month=1, value_eur=30_000_000),
+        _flow(flow="IMPORT", period="2024-01", year=2024, month=1, value_eur=10_000_000),
+    )
+    out = footwear.balance(con, chart_type="pie")
+    series = {s["name"]: s["type"] for s in out["echarts"]["series"]}
+    assert series["Saldo"] == "bar"

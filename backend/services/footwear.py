@@ -19,6 +19,11 @@ def _scope(heading: str) -> tuple[str, str]:
     return "heading = ?", heading
 
 
+def _chart_type(requested: str | None, allowed: set[str], default: str) -> str:
+    """The requested chart type if the data/widget supports it, else the default."""
+    return requested if requested in allowed else default
+
+
 def _pct(value: float, base: float) -> float | None:
     if not base:
         return None
@@ -82,8 +87,12 @@ def filter_options(con) -> dict:
     return {"periods": periods, "headings": headings, "countries": countries}
 
 
-def evolution(con, *, flow: str, heading: str = "64", months: int = 24) -> dict:
+def evolution(
+    con, *, flow: str, heading: str = "64", months: int = 24,
+    chart_type: str | None = None,
+) -> dict:
     """Monthly value trend for a flow + TARIC scope, with a year-on-year KPI."""
+    series_type = _chart_type(chart_type, {"line", "bar"}, "line")
     pred, param = _scope(heading)
     where = f"flow = ? AND {pred}"
     args = [flow, param]
@@ -133,7 +142,7 @@ def evolution(con, *, flow: str, heading: str = "64", months: int = 24) -> dict:
             "xAxis": {"type": "category", "data": periods},
             "yAxis": {"type": "value", "name": "M€"},
             "series": [
-                {"name": "Valor", "type": "line", "smooth": True, "data": values_m}
+                {"name": "Valor", "type": series_type, "smooth": True, "data": values_m}
             ],
         },
         "kpis": [_pct_kpi("Var. interanual", trailing, prior)],
@@ -153,8 +162,10 @@ def country_ranking(
     period_from: str | None = None,
     period_to: str | None = None,
     top_n: int = 10,
+    chart_type: str | None = None,
 ) -> dict:
     """Top partner countries by traded value for a flow + TARIC scope."""
+    series_type = _chart_type(chart_type, {"bar", "pie"}, "bar")
     pred, param = _scope(heading)
     where = f"flow = ? AND {pred}"
     args: list = [flow, param]
@@ -188,15 +199,33 @@ def country_ranking(
     leader_share = (rows[0][1] / total * 100.0) if rows and total else 0.0
 
     scope_label = "de calzado" if len(heading) <= 2 else f"(partida {heading})"
-    return {
-        "widget": "country_ranking",
-        "title": f"{_FLOW_LABEL.get(flow, flow)} {scope_label} por país (top {top_n})",
-        "echarts": {
+    if series_type == "pie":
+        echarts = {
+            "tooltip": {"trigger": "item", "formatter": "{b}: {c} M€ ({d}%)"},
+            "legend": {"bottom": 0},
+            "series": [
+                {
+                    "type": "pie",
+                    "radius": ["40%", "70%"],
+                    "data": [
+                        {"name": c, "value": v}
+                        for c, v in zip(countries[::-1], values_m[::-1])
+                    ],
+                }
+            ],
+        }
+    else:
+        echarts = {
             "tooltip": {"trigger": "axis"},
             "xAxis": {"type": "value", "name": "M€"},
             "yAxis": {"type": "category", "data": countries},
             "series": [{"name": "Valor", "type": "bar", "data": values_m}],
-        },
+        }
+
+    return {
+        "widget": "country_ranking",
+        "title": f"{_FLOW_LABEL.get(flow, flow)} {scope_label} por país (top {top_n})",
+        "echarts": echarts,
         "kpis": [
             {"label": "Cuota del líder", "value": f"{leader_share:.1f}%", "tone": "neutral"}
         ],
@@ -215,9 +244,11 @@ def _period_range(where: str, args: list, period_from, period_to):
 
 
 def product_mix(
-    con, *, flow: str, period_from: str | None = None, period_to: str | None = None
+    con, *, flow: str, period_from: str | None = None, period_to: str | None = None,
+    chart_type: str | None = None,
 ) -> dict:
     """Share of traded value by TARIC heading (6401–6406) — a donut."""
+    series_type = _chart_type(chart_type, {"pie", "bar"}, "pie")
     where, args = _period_range("flow = ? AND chapter = '64'", [flow], period_from, period_to)
     rows = con.execute(
         f"""SELECT heading, SUM(value_eur) FROM datacomex.trade_flows
@@ -231,10 +262,16 @@ def product_mix(
     ]
     top_share = max((v for _, v in rows), default=0) / total * 100.0 if total else 0.0
 
-    return {
-        "widget": "product_mix",
-        "title": f"{_FLOW_LABEL.get(flow, flow)} de calzado por tipo de producto",
-        "echarts": {
+    if series_type == "bar":
+        echarts = {
+            "tooltip": {"trigger": "axis"},
+            "xAxis": {"type": "category", "data": [d["name"] for d in data]},
+            "yAxis": {"type": "value", "name": "M€"},
+            "series": [{"name": "Valor", "type": "bar",
+                        "data": [d["value"] for d in data]}],
+        }
+    else:
+        echarts = {
             "tooltip": {"trigger": "item", "formatter": "{b}: {c} M€ ({d}%)"},
             "legend": {"bottom": 0},
             "series": [
@@ -245,7 +282,12 @@ def product_mix(
                     "label": {"formatter": "{b}\n{d}%"},
                 }
             ],
-        },
+        }
+
+    return {
+        "widget": "product_mix",
+        "title": f"{_FLOW_LABEL.get(flow, flow)} de calzado por tipo de producto",
+        "echarts": echarts,
         "kpis": [
             {"label": "Cuota del tipo dominante", "value": f"{top_share:.1f}%", "tone": "neutral"}
         ],
@@ -260,8 +302,10 @@ def avg_price(
     heading: str = "64",
     country: str | None = None,
     months: int = 24,
+    chart_type: str | None = None,
 ) -> dict:
     """Implied unit price (€/kg) over time; null where a period has no weight."""
+    series_type = _chart_type(chart_type, {"line", "bar"}, "line")
     pred, param = _scope(heading)
     where = f"flow = ? AND {pred}"
     args: list = [flow, param]
@@ -306,8 +350,8 @@ def avg_price(
             "xAxis": {"type": "category", "data": periods},
             "yAxis": {"type": "value", "name": "€/kg"},
             "series": [
-                {"name": "€/kg", "type": "line", "smooth": True, "connectNulls": False,
-                 "data": prices}
+                {"name": "€/kg", "type": series_type, "smooth": True,
+                 "connectNulls": False, "data": prices}
             ],
         },
         "kpis": [kpi],
@@ -315,8 +359,11 @@ def avg_price(
     }
 
 
-def balance(con, *, heading: str = "64", months: int = 24) -> dict:
+def balance(
+    con, *, heading: str = "64", months: int = 24, chart_type: str | None = None,
+) -> dict:
     """Monthly trade balance (exports − imports) plus its running total."""
+    series_type = _chart_type(chart_type, {"bar", "line"}, "bar")
     pred, param = _scope(heading)
     where = pred
     args: list = [param]
@@ -358,7 +405,7 @@ def balance(con, *, heading: str = "64", months: int = 24) -> dict:
             "xAxis": {"type": "category", "data": periods},
             "yAxis": {"type": "value", "name": "M€"},
             "series": [
-                {"name": "Saldo", "type": "bar", "data": saldo},
+                {"name": "Saldo", "type": series_type, "data": saldo},
                 {"name": "Acumulado", "type": "line", "smooth": True, "data": cumulative},
             ],
         },
