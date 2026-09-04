@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 venv/
 backend/warehouse/warehouse.duckdb
+backend/warehouse/footwear.duckdb
 .pytest_cache/

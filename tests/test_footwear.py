@@ -1,0 +1,169 @@
+import duckdb
+import pytest
+
+from backend.services import footwear
+from backend.warehouse.datacomex_schema import HEADINGS, SCHEMA_DDL
+
+
+@pytest.fixture
+def con(tmp_path):
+    """A tiny, fully-controlled DataComex warehouse."""
+    c = duckdb.connect(str(tmp_path / "dc.duckdb"))
+    c.execute(SCHEMA_DDL)
+    c.executemany(
+        "INSERT INTO datacomex.taric_tree VALUES (?, ?, ?, ?)",
+        [("64", None, 2, "Calzado, polainas y artículos análogos")]
+        + [(h, "64", 4, desc) for h, (desc, _) in HEADINGS.items()],
+    )
+    yield c
+    c.close()
+
+
+def _flow(**kw):
+    base = dict(
+        flow="IMPORT", period="2025-01", year=2025, month=1,
+        country_code="CHN", country_name="China", taric_code="640411",
+        chapter="64", heading="6404", value_eur=1_000_000, weight_kg=200_000,
+        suppl_units=500_000, is_provisional=False,
+    )
+    base.update(kw)
+    return tuple(base[k] for k in (
+        "flow", "period", "year", "month", "country_code", "country_name",
+        "taric_code", "chapter", "heading", "value_eur", "weight_kg",
+        "suppl_units", "is_provisional",
+    ))
+
+
+def _insert(con, *rows):
+    con.executemany(
+        "INSERT INTO datacomex.trade_flows VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        list(rows),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# resolve_taric
+# --------------------------------------------------------------------------- #
+def test_resolve_taric_maps_deportivas_to_textile_heading(con):
+    assert footwear.resolve_taric(con, "zapatillas deportivas") == "6404"
+
+
+def test_resolve_taric_maps_botas_de_agua_to_waterproof_heading(con):
+    assert footwear.resolve_taric(con, "botas de agua") == "6401"
+
+
+def test_resolve_taric_maps_cuero_to_leather_heading(con):
+    assert footwear.resolve_taric(con, "botas de cuero") == "6403"
+
+
+def test_resolve_taric_falls_back_to_description_match(con):
+    assert footwear.resolve_taric(con, "polainas") == "6406"
+
+
+def test_resolve_taric_unknown_returns_none(con):
+    assert footwear.resolve_taric(con, "bufanda de lana") is None
+
+
+# --------------------------------------------------------------------------- #
+# evolution
+# --------------------------------------------------------------------------- #
+def test_evolution_returns_monthly_totals_in_millions(con):
+    _insert(
+        con,
+        _flow(period="2024-10", year=2024, month=10, value_eur=10_000_000),
+        _flow(period="2024-11", year=2024, month=11, value_eur=12_000_000),
+        _flow(period="2024-12", year=2024, month=12, value_eur=15_500_000),
+    )
+    out = footwear.evolution(con, flow="IMPORT", heading="64", months=12)
+
+    assert out["widget"] == "monthly_evolution"
+    assert out["echarts"]["xAxis"]["data"] == ["2024-10", "2024-11", "2024-12"]
+    series = out["echarts"]["series"][0]
+    assert series["type"] == "line"
+    assert series["data"] == [10.0, 12.0, 15.5]  # M€
+    assert out["meta"]["unit"] == "EUR"
+
+
+def test_evolution_yoy_kpi_is_percent_change(con):
+    _insert(
+        con,
+        _flow(period="2023-06", year=2023, month=6, value_eur=100_000_000),
+        _flow(period="2024-06", year=2024, month=6, value_eur=120_000_000),
+    )
+    out = footwear.evolution(con, flow="IMPORT", heading="64", months=24)
+    kpi = next(k for k in out["kpis"] if "interanual" in k["label"].lower())
+    assert kpi["value"] == "+20.0%"
+    assert kpi["tone"] == "positive"
+
+
+def test_evolution_filters_by_heading(con):
+    _insert(
+        con,
+        _flow(period="2024-01", year=2024, month=1, heading="6404",
+              taric_code="640411", value_eur=5_000_000),
+        _flow(period="2024-01", year=2024, month=1, heading="6403",
+              taric_code="640312", value_eur=99_000_000),
+    )
+    out = footwear.evolution(con, flow="IMPORT", heading="6404", months=12)
+    assert out["echarts"]["series"][0]["data"] == [5.0]
+
+
+def test_evolution_flags_provisional_periods(con):
+    _insert(
+        con,
+        _flow(period="2024-11", year=2024, month=11, value_eur=1_000_000),
+        _flow(period="2024-12", year=2024, month=12, value_eur=1_000_000,
+              is_provisional=True),
+    )
+    out = footwear.evolution(con, flow="IMPORT", heading="64", months=12)
+    assert out["meta"]["is_provisional"] is True
+
+
+# --------------------------------------------------------------------------- #
+# country_ranking
+# --------------------------------------------------------------------------- #
+def test_country_ranking_orders_by_value_and_reverses_for_horizontal_bar(con):
+    _insert(
+        con,
+        _flow(country_code="CHN", country_name="China", value_eur=50_000_000),
+        _flow(country_code="VNM", country_name="Vietnam", value_eur=30_000_000),
+        _flow(country_code="ITA", country_name="Italia", value_eur=10_000_000),
+    )
+    out = footwear.country_ranking(con, flow="IMPORT", heading="64", top_n=2)
+
+    assert out["widget"] == "country_ranking"
+    # horizontal bar => #1 partner sits at the top of the y axis
+    assert out["echarts"]["yAxis"]["data"] == ["Vietnam", "China"]
+    assert out["echarts"]["series"][0]["data"] == [30.0, 50.0]
+
+
+def test_country_ranking_respects_period_range(con):
+    _insert(
+        con,
+        _flow(country_name="China", period="2024-01", year=2024, month=1,
+              value_eur=99_000_000),
+        _flow(country_name="China", period="2024-06", year=2024, month=6,
+              value_eur=5_000_000),
+    )
+    out = footwear.country_ranking(
+        con, flow="IMPORT", period_from="2024-05", period_to="2024-12"
+    )
+    assert out["echarts"]["series"][0]["data"] == [5.0]
+
+
+def test_country_ranking_leader_share_kpi(con):
+    _insert(
+        con,
+        _flow(country_code="CHN", country_name="China", value_eur=80_000_000),
+        _flow(country_code="VNM", country_name="Vietnam", value_eur=20_000_000),
+    )
+    out = footwear.country_ranking(con, flow="IMPORT")
+    kpi = next(k for k in out["kpis"] if "lider" in _ascii(k["label"]))
+    assert kpi["value"] == "80.0%"
+
+
+def _ascii(s: str) -> str:
+    import unicodedata
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s.lower()) if not unicodedata.combining(c)
+    )
