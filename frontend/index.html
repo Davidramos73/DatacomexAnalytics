@@ -374,6 +374,16 @@ const store = {
 };
 
 /* ---------- chart card ---------- */
+// Report/chat cards clip overflow (rounded corners), which also clips an
+// ECharts tooltip whenever it would render near an edge (SVG renderer draws
+// it inside the chart's own container by default). appendToBody moves the
+// tooltip to <body> so it's never cut off.
+function withTooltip(echartsOption) {
+  return Object.assign({}, echartsOption, {
+    tooltip: Object.assign({ appendToBody: true }, echartsOption.tooltip),
+  });
+}
+
 function disposeThreadCharts() {
   threadInner.querySelectorAll(".card-body > div").forEach(d => {
     const inst = echarts.getInstanceByDom(d);
@@ -415,7 +425,7 @@ function buildChartCard({ title, meta, spec }) {
         try {
           const inst = echarts.init(host, chartTheme === "default" ? null : chartTheme, { renderer: "svg" });
           // Every theme sits on the white card — ignore a theme's own page colour.
-          inst.setOption(Object.assign({ backgroundColor: "transparent" }, spec));
+          inst.setOption(Object.assign({ backgroundColor: "transparent" }, withTooltip(spec)));
           const ro = new ResizeObserver(() => inst.resize());
           ro.observe(host);
           bodyEl._chart = inst;
@@ -831,7 +841,7 @@ async function loadReports() {
           .filter(Boolean).join(" ")));
 
       const inst = echarts.init(host, chartTheme === "default" ? null : chartTheme, { renderer: "svg" });
-      inst.setOption(Object.assign({ backgroundColor: "transparent" }, spec.echarts));
+      inst.setOption(Object.assign({ backgroundColor: "transparent" }, withTooltip(spec.echarts)));
       new ResizeObserver(() => inst.resize()).observe(host);
       rpCharts[w.key] = inst;
     } catch (e) {
