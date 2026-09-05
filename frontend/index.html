@@ -82,6 +82,11 @@
   .step-label{font-size:12px;font-weight:500;color:#3a3835}
   .step-detail{margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;color:#7b776f;white-space:pre-wrap;word-break:break-word}
   .para{font-size:14.5px;line-height:1.65;color:#26241f}
+  .para p{margin:0 0 8px}
+  .para p:last-child{margin-bottom:0}
+  .para ul{margin:0 0 8px;padding-left:20px}
+  .para li{margin:2px 0}
+  .para code{font-family:'IBM Plex Mono',monospace;font-size:13px;background:rgba(0,0,0,.05);padding:1px 5px;border-radius:4px}
   .thinking{display:flex;align-items:center;gap:8px;font-size:13px;color:#8b8781}
   .thinking i{width:5px;height:5px;border-radius:50%;background:#a09b93;animation:dotpulse 1.2s infinite}
   .thinking i:nth-child(2){animation-delay:.2s}.thinking i:nth-child(3){animation-delay:.4s}
@@ -271,6 +276,29 @@ const el = (tag, cls, html) => {
   return n;
 };
 const esc = s => String(s).replace(/</g, "&lt;");
+
+// Tiny markdown: **bold**, *italic*, `code`, "- " bullet lists. No links/headers —
+// agent prose doesn't need them, and it keeps this safe (only esc()'d text ever
+// becomes markup).
+function mdLite(raw) {
+  const inline = s => esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+  let html = "", inList = false;
+  for (const line of String(raw).split("\n")) {
+    const bullet = /^\s*[-*]\s+(.*)/.exec(line);
+    if (bullet) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${inline(bullet[1])}</li>`;
+    } else {
+      if (inList) { html += "</ul>"; inList = false; }
+      if (line.trim()) html += `<p>${inline(line)}</p>`;
+    }
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
 const uid = p => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 const thread = $("#thread"), threadInner = $("#threadInner");
@@ -444,7 +472,7 @@ function renderAgentMessage(msg) {
     trace.appendChild(steps);
     body.appendChild(trace);
   }
-  (msg.paras || []).forEach(t => body.appendChild(el("div", "para", esc(t))));
+  (msg.paras || []).forEach(t => body.appendChild(el("div", "para", mdLite(t))));
   if (msg.chart) body.appendChild(buildChartCard(msg.chart));
   if (msg.error) {
     const c = el("div", "card");
@@ -652,8 +680,8 @@ function liveAgentBlock() {
     },
     text(t) {
       thinking.remove();
-      if (paraEl) { paraEl.textContent = t; paraEl = null; }
-      else body.appendChild(el("div", "para", esc(t)));
+      if (paraEl) { paraEl.innerHTML = mdLite(t); paraEl = null; }
+      else body.appendChild(el("div", "para", mdLite(t)));
     },
     error(msg) {
       thinking.remove();
