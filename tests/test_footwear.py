@@ -108,7 +108,7 @@ def test_evolution_filters_by_heading(con):
     assert out["echarts"]["series"][0]["data"] == [5.0]
 
 
-def test_evolution_flags_provisional_periods(con):
+def test_evolution_notes_flag_provisional(con):
     _insert(
         con,
         _flow(period="2024-11", year=2024, month=11, value_eur=1_000_000),
@@ -116,7 +116,8 @@ def test_evolution_flags_provisional_periods(con):
               is_provisional=True),
     )
     out = footwear.evolution(con, flow="IMPORT", heading="64", months=12)
-    assert out["meta"]["is_provisional"] is True
+    assert "incluye datos provisionales" in out["meta"]["notes"]
+    assert "is_provisional" not in out["meta"]
 
 
 def test_evolution_accepts_bar_chart_type(con):

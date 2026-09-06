@@ -149,7 +149,7 @@ def evolution(
         "meta": {
             "unit": "EUR",
             "granularity": "monthly",
-            "is_provisional": provisional,
+            "notes": (["incluye datos provisionales"] if provisional else []),
         },
     }
 
@@ -229,7 +229,7 @@ def country_ranking(
         "kpis": [
             {"label": "Cuota del líder", "value": f"{leader_share:.1f}%", "tone": "neutral"}
         ],
-        "meta": {"unit": "EUR", "granularity": "range"},
+        "meta": {"unit": "EUR", "granularity": "range", "notes": []},
     }
 
 
@@ -291,7 +291,7 @@ def product_mix(
         "kpis": [
             {"label": "Cuota del tipo dominante", "value": f"{top_share:.1f}%", "tone": "neutral"}
         ],
-        "meta": {"unit": "EUR", "granularity": "range"},
+        "meta": {"unit": "EUR", "granularity": "range", "notes": []},
     }
 
 
