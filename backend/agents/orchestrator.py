@@ -7,6 +7,7 @@ from backend import charts, events
 from backend.agents import llm
 from backend.agents.data_agent import answer_data_question
 from backend.config import LLM_MODEL
+from backend.history import clean_history, MAX_HISTORY_TURNS
 
 _SYSTEM = """\
 You are an analytics orchestrator. You have a data analyst subordinate you reach
@@ -29,8 +30,6 @@ Earlier turns of this conversation may be provided for context. The user's
 latest message can build on them (e.g. "now break that down by month" or
 "same thing for EMEA") - resolve such references before writing data questions.
 """
-
-MAX_HISTORY_TURNS = 6
 
 _QUERY_DATA_TOOL = {
     "name": "query_data",
@@ -88,25 +87,6 @@ def _chartability(dataset) -> tuple:
     records = [dict(zip(dataset.columns, r)) for r in dataset.rows[:20]]
     has_numeric = any(charts._is_numeric(records, c) for c in dataset.columns)
     return (rows if has_numeric else 0, rows)
-
-
-def clean_history(turns) -> list[dict]:
-    """Coerce client-supplied turns into a valid alternating message list:
-    only user/assistant roles, non-empty, no consecutive same-role, starts
-    with a user turn, capped to the most recent MAX_HISTORY_TURNS."""
-    out: list[dict] = []
-    for t in turns or []:
-        role = t.get("role")
-        content = (t.get("content") or "").strip()
-        if role not in ("user", "assistant") or not content:
-            continue
-        if out and out[-1]["role"] == role:
-            out[-1] = {"role": role, "content": content}
-        else:
-            out.append({"role": role, "content": content})
-    while out and out[0]["role"] != "user":
-        out.pop(0)
-    return out[-MAX_HISTORY_TURNS:]
 
 
 def run(

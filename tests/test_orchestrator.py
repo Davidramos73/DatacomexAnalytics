@@ -1,6 +1,7 @@
 import json
 from backend import events
 from backend.agents import orchestrator, llm, data_agent
+from backend.history import clean_history, MAX_HISTORY_TURNS
 
 
 def _dr(**kw):
@@ -74,7 +75,7 @@ def test_clean_history_sanitizes_turns():
         {"role": "user", "content": ""},              # empty -> skipped
         {"role": "user", "content": "Q2"},
     ]
-    assert orchestrator.clean_history(turns) == [
+    assert clean_history(turns) == [
         {"role": "user", "content": "Q1 (edited)"},
         {"role": "assistant", "content": "A1"},
         {"role": "user", "content": "Q2"},
@@ -86,8 +87,8 @@ def test_clean_history_caps_length():
     for i in range(20):
         turns.append({"role": "user", "content": f"q{i}"})
         turns.append({"role": "assistant", "content": f"a{i}"})
-    out = orchestrator.clean_history(turns)
-    assert len(out) == orchestrator.MAX_HISTORY_TURNS
+    out = clean_history(turns)
+    assert len(out) == MAX_HISTORY_TURNS
     assert out[-1] == {"role": "assistant", "content": "a19"}
 
 

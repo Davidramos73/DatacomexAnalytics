@@ -14,8 +14,8 @@ import duckdb
 import backend.config as config
 from backend import events
 from backend.agents import llm, tools_footwear
-from backend.agents.orchestrator import clean_history
 from backend.config import LLM_MODEL
+from backend.history import clean_history
 
 _SYSTEM = """\
 Eres analista de comercio exterior de la industria española del calzado. Respondes
