@@ -496,6 +496,29 @@ export function mountChat(host, cfg = {}) {
 }
 
 /* =====================================================================
+ * buildWidgetUrl — pure REST-URL builder for a widget descriptor
+ * ===================================================================== */
+// desc = { rest_path, params: [{ name, required, default, ... }] }
+// values = { paramName: currentValue }
+// Returns rest_path (prefixed with basePath when rest_path is relative) plus a
+// querystring built ONLY from params the descriptor declares, each bound to
+// values[name] or its default, skipping resolved undefined/null/"" unless the
+// param is required with a default.
+export function buildWidgetUrl(desc, values = {}, basePath = "") {
+  const path = desc.rest_path.startsWith("/") ? desc.rest_path : basePath + desc.rest_path;
+  const qs = new URLSearchParams();
+  for (const p of desc.params || []) {
+    let v = Object.prototype.hasOwnProperty.call(values, p.name) ? values[p.name] : p.default;
+    if (v === undefined || v === null || v === "") {
+      if (p.required && p.default != null) v = p.default; else continue;
+    }
+    qs.set(p.name, v);
+  }
+  const q = qs.toString();
+  return q ? path + "?" + q : path;
+}
+
+/* =====================================================================
  * mountWidgetGrid
  * ===================================================================== */
 export function mountWidgetGrid(host, cfg = {}) {
@@ -574,20 +597,6 @@ export function mountWidgetGrid(host, cfg = {}) {
 
   const charts = {};
 
-  function urlFor(key, desc) {
-    const path = desc.rest_path.startsWith("/") ? desc.rest_path : basePath + desc.rest_path;
-    const qs = new URLSearchParams();
-    for (const p of desc.params || []) {
-      let v = Object.prototype.hasOwnProperty.call(values, p.name) ? values[p.name] : p.default;
-      if (v === undefined || v === null || v === "") {
-        if (p.required && p.default != null) v = p.default; else continue;
-      }
-      qs.set(p.name, v);
-    }
-    const q = qs.toString();
-    return q ? path + "?" + q : path;
-  }
-
   async function load() {
     Object.values(charts).forEach(c => c.dispose());
     for (const k in charts) delete charts[k];
@@ -597,7 +606,7 @@ export function mountWidgetGrid(host, cfg = {}) {
       const card = el("div", "rp-card" + (desc.span === "half" ? " half" : ""));
       grid.appendChild(card);
       try {
-        const spec = await fetch(urlFor(key, desc)).then(r => r.json());
+        const spec = await fetch(buildWidgetUrl(desc, values, basePath)).then(r => r.json());
         const head = el("div", "rp-card-head");
         head.appendChild(el("div", "rp-card-title", esc(spec.title || key)));
         const kpis = el("div", "rp-kpis");
