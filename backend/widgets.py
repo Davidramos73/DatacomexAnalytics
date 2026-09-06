@@ -41,3 +41,25 @@ def chart_type_param(chart_types: list[str]) -> Param:
         enum=list(chart_types),
         ui_label=None,
     )
+
+
+def _param_dict(p: Param) -> dict:
+    return {
+        "name": p.name, "type": p.type, "required": p.required,
+        "default": p.default, "enum": p.enum, "ui_label": p.ui_label,
+        "ui_options": p.ui_options, "ui_options_from": p.ui_options_from,
+        "ui_option_label": p.ui_option_label,
+    }
+
+
+def widget_descriptors(widgets: list[Widget]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for w in widgets:
+        out[w.key] = {
+            "rest_path": w.rest_path,
+            "span": w.span,
+            "params": [
+                _param_dict(p) for p in w.params if p.name != "chart_type"
+            ],
+        }
+    return out
