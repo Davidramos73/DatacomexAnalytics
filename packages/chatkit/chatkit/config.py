@@ -8,7 +8,7 @@ LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic").lower()
 
 # "footwear" routes /api/chat through the DataComex footwear orchestrator
 # (typed report tools); "analytics" uses the free-SQL demo warehouse.
-CHAT_DOMAIN = os.environ.get("CHAT_DOMAIN", "footwear").lower()
+CHAT_DOMAIN = os.environ.get("CHAT_DOMAIN", "footwear").lower()  # TODO(4.3): dead — caller picks the domain
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = os.environ.get(

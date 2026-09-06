@@ -37,6 +37,7 @@ _PUBLIC = (
     "/healthz",
     "/api/app-config",
     "/_chatkit/",
+    "/app.css",
 )
 
 
