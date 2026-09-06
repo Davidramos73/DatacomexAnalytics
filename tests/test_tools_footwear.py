@@ -45,12 +45,12 @@ def test_resolve_handler_returns_a_heading(con):
 
 def test_market_overview_handler_returns_a_chart_envelope(con):
     impls = tools_footwear.handlers(con)
-    out = json.loads(impls["footwear_market_overview"](flow="import", months=12))
+    out = json.loads(impls["footwear_market_overview"](flow="IMPORT", months=12))
     assert out["widget"] == "monthly_evolution"
     assert out["echarts"]["series"][0]["type"] == "line"
 
 
 def test_top_partners_handler_uppercases_flow(con):
     impls = tools_footwear.handlers(con)
-    out = json.loads(impls["footwear_top_partners"](flow="import", top_n=5))
+    out = json.loads(impls["footwear_top_partners"](flow="IMPORT", top_n=5))
     assert out["echarts"]["yAxis"]["data"] == ["Vietnam", "China"]

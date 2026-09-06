@@ -2,14 +2,16 @@ import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
+import backend.config as config
 from backend import app as app_module
-from backend.routers import reports
 from backend.warehouse.datacomex_schema import HEADINGS, SCHEMA_DDL
 
 
 @pytest.fixture
-def client(tmp_path):
-    c = duckdb.connect(str(tmp_path / "dc.duckdb"))
+def client(tmp_path, monkeypatch):
+    db_path = tmp_path / "dc.duckdb"
+    monkeypatch.setattr(config, "DATACOMEX_PATH", db_path)
+    c = duckdb.connect(str(db_path))
     c.execute(SCHEMA_DDL)
     c.executemany(
         "INSERT INTO datacomex.taric_tree VALUES (?, ?, ?, ?)",
@@ -27,15 +29,13 @@ def client(tmp_path):
              20_000_000, 2_000_000, None, False),
         ],
     )
-    app_module.app.dependency_overrides[reports.get_footwear_con] = lambda: c
-    yield TestClient(app_module.app)
-    app_module.app.dependency_overrides.clear()
     c.close()
+    yield TestClient(app_module.app)
 
 
 def test_evolution_endpoint(client):
     r = client.get(
-        "/api/v1/reports/footwear/evolution", params={"flow": "import", "months": 12}
+        "/api/v1/reports/footwear/evolution", params={"flow": "IMPORT", "months": 12}
     )
     assert r.status_code == 200
     body = r.json()
@@ -45,7 +45,7 @@ def test_evolution_endpoint(client):
 
 def test_countries_endpoint(client):
     r = client.get(
-        "/api/v1/reports/footwear/countries", params={"flow": "import", "top_n": 5}
+        "/api/v1/reports/footwear/countries", params={"flow": "IMPORT", "top_n": 5}
     )
     assert r.status_code == 200
     assert r.json()["echarts"]["yAxis"]["data"] == ["Vietnam", "China"]
@@ -59,7 +59,7 @@ def test_filter_options_endpoint(client):
 
 def test_product_mix_endpoint(client):
     r = client.get(
-        "/api/v1/reports/footwear/product-mix", params={"flow": "import"}
+        "/api/v1/reports/footwear/product-mix", params={"flow": "IMPORT"}
     )
     assert r.status_code == 200
     assert r.json()["widget"] == "product_mix"
@@ -68,7 +68,7 @@ def test_product_mix_endpoint(client):
 
 def test_avg_price_endpoint(client):
     r = client.get(
-        "/api/v1/reports/footwear/avg-price", params={"flow": "import", "months": 12}
+        "/api/v1/reports/footwear/avg-price", params={"flow": "IMPORT", "months": 12}
     )
     assert r.status_code == 200
     body = r.json()
