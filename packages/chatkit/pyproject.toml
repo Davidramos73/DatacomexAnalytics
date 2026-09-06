@@ -1,0 +1,22 @@
+[project]
+name = "chatkit"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi", "uvicorn[standard]", "duckdb", "pydantic",
+  "anthropic", "openai", "google-auth", "requests", "itsdangerous",
+]
+
+[project.optional-dependencies]
+sql = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["chatkit*"]
+
+[tool.setuptools.package-data]
+chatkit = ["frontend/*"]
