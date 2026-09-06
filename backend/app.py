@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import backend.config as config
 from backend import events
+from backend.app_config import build_app_config
 from backend.chat import run_chat
 from backend.footwear_domain import FootwearDomain
 from backend.sql_domain import SqlDomain
@@ -26,7 +27,7 @@ from backend.routers import reports
 DOMAIN = FootwearDomain() if config.CHAT_DOMAIN == "footwear" else SqlDomain()
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
-_PUBLIC = ("/login.html", "/auth/", "/favicon", "/healthz")
+_PUBLIC = ("/login.html", "/auth/", "/favicon", "/healthz", "/api/app-config")
 
 app = FastAPI(title="Agent Chat Analytics")
 app.include_router(auth_router.router)
@@ -69,6 +70,11 @@ app.add_middleware(
 @app.get("/healthz")
 def healthz() -> dict:
     return {"ok": True}
+
+
+@app.get("/api/app-config")
+def app_config() -> dict:
+    return build_app_config(DOMAIN)
 
 
 class Turn(BaseModel):
