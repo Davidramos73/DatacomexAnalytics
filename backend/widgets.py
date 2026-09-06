@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import inspect
+import json
 from typing import Any, Callable, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -145,3 +146,48 @@ def build_rest_router(
             name=w.key,
         )
     return router
+
+
+_JSON_TYPE = {"enum": "string", "str": "string", "period": "string", "int": "integer"}
+
+
+def _tool_def(w: Widget) -> dict:
+    props: dict = {}
+    required: list[str] = []
+    for p in w.params:
+        schema = {"type": _JSON_TYPE[p.type]}
+        if p.enum:
+            schema["enum"] = list(p.enum)
+        if p.ui_label:
+            schema["description"] = p.ui_label
+        props[p.name] = schema
+        if p.required:
+            required.append(p.name)
+    return {
+        "name": w.tool_name,
+        "description": w.tool_description,
+        "input_schema": {
+            "type": "object",
+            "properties": props,
+            "required": required,
+            "additionalProperties": False,
+        },
+    }
+
+
+def _handler(w: Widget, con):
+    int_params = {p.name for p in w.params if p.type == "int"}
+
+    def run(**kw):
+        coerced = {k: (int(v) if k in int_params and v is not None else v)
+                   for k, v in kw.items()}
+        return json.dumps(w.fn(con, **coerced))
+
+    return run
+
+
+def build_tool_set(widgets: list[Widget], con) -> dict:
+    return {
+        "defs": [_tool_def(w) for w in widgets],
+        "handlers": {w.tool_name: _handler(w, con) for w in widgets},
+    }

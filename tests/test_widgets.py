@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -5,6 +7,7 @@ from backend.widgets import (
     Param,
     Widget,
     build_rest_router,
+    build_tool_set,
     chart_type_param,
     widget_descriptors,
 )
@@ -72,3 +75,24 @@ def test_build_rest_router_calls_fn_with_params():
     assert seen == {"flow": "IMPORT", "months": 6}
 
     assert client.get("/r/evolution", params={"flow": "NOPE"}).status_code == 422
+
+
+def test_build_tool_set_defs_and_handlers():
+    def mix(con, *, flow, chart_type=None):
+        return {"widget": "mix", "flow": flow, "chart_type": chart_type}
+
+    w = Widget(key="mix", fn=mix, rest_path="/mix", tool_name="product_mix",
+               tool_description="reparto por tipo",
+               chart_types=["pie", "bar"],
+               params=[Param("flow", "enum", required=True, enum=["IMPORT", "EXPORT"]),
+                       chart_type_param(["pie", "bar"])])
+    ts = build_tool_set([w], con=None)
+
+    d = ts["defs"][0]
+    assert d["name"] == "product_mix"
+    assert d["input_schema"]["properties"]["flow"]["enum"] == ["IMPORT", "EXPORT"]
+    assert d["input_schema"]["properties"]["chart_type"]["enum"] == ["pie", "bar"]
+    assert d["input_schema"]["required"] == ["flow"]
+
+    out = json.loads(ts["handlers"]["product_mix"](flow="IMPORT", chart_type="bar"))
+    assert out == {"widget": "mix", "flow": "IMPORT", "chart_type": "bar"}
