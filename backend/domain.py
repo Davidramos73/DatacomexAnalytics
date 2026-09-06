@@ -32,6 +32,9 @@ class AppConfig:
     example_prompts: list[str]
     echarts_themes: list[str]
     tabs: list[TabDescriptor]
+    # UI copy overrides consumed by chatkit.js: empty_title, empty_text,
+    # placeholder, hint_html. Any missing key falls back to a generic default.
+    copy: dict = dataclasses.field(default_factory=dict)
 
 
 class Domain(Protocol):

@@ -534,6 +534,8 @@ export function mountWidgetGrid(host, cfg = {}) {
     if (p.type === "int") {
       control = el("input");
       control.type = "number";
+      if (p.ui_min != null) control.min = p.ui_min;
+      if (p.ui_max != null) control.max = p.ui_max;
       if (p.default != null) control.value = p.default;
       control.style.width = "70px";
     } else if (p.ui_options || p.ui_options_from) {
@@ -547,7 +549,7 @@ export function mountWidgetGrid(host, cfg = {}) {
       // A non-required param with a default that no option covers still needs a
       // row (e.g. heading "64" = everything) — keep it first.
       if (p.default != null && !opts.some(o => o[0] === String(p.default))) {
-        opts.unshift([String(p.default), String(p.default)]);
+        opts.unshift([String(p.default), p.ui_default_label || String(p.default)]);
       }
       opts.forEach(([v, l]) => {
         const o = el("option"); o.value = v; o.textContent = l;
@@ -785,19 +787,23 @@ export async function boot(opts = {}) {
 
   /* ---------- chat ---------- */
   const firstTab = tabs[0];
-  const hintHtml = "Respuestas generadas por IA a partir de datos oficiales"
-    + (branding.badge ? " (" + esc(branding.badge) + ")" : "")
-    + " · pueden contener errores, verifica cifras críticas"
-    + (firstTab ? ' · <a href="#" data-role="hint-tab">ver ' + esc(firstTab.label.toLowerCase()) + "</a>" : "");
+  // UI copy: the domain's /api/app-config `copy` block wins, then boot(opts),
+  // then a generic default so any project renders something sensible.
+  const copy = config.copy || {};
+  const hintHtml = copy.hint_html || opts.hintHtml
+    || ("Respuestas generadas por IA a partir de datos oficiales"
+      + (branding.badge ? " (" + esc(branding.badge) + ")" : "")
+      + " · pueden contener errores, verifica cifras críticas"
+      + (firstTab ? ' · <a href="#" data-role="hint-tab">ver ' + esc(firstTab.label.toLowerCase()) + "</a>" : ""));
 
   const chat = mountChat(chatView, {
     endpoint: opts.endpoint || "/api/chat",
     prompts: config.example_prompts || [],
     storageKey: opts.storageKey || "lumen.v1",
     themes,
-    placeholder: opts.placeholder || "Escribe tu pregunta…",
-    emptyTitle: opts.emptyTitle || "¿Qué miramos hoy?",
-    emptyText: opts.emptyText,
+    placeholder: copy.placeholder || opts.placeholder || "Escribe tu pregunta…",
+    emptyTitle: copy.empty_title || opts.emptyTitle || "¿Qué miramos hoy?",
+    emptyText: copy.empty_text || opts.emptyText,
     hintHtml,
     onTitle: t => { if (current === "chat") headerTitle.textContent = t; },
     onChatsChanged: () => renderSidebar(),

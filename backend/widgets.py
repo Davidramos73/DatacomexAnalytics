@@ -22,6 +22,9 @@ class Param:
     ui_options: list[dict] | None = None
     ui_options_from: str | None = None
     ui_option_label: str | None = None
+    ui_default_label: str | None = None
+    ui_min: int | None = None
+    ui_max: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +57,8 @@ def _param_dict(p: Param) -> dict:
         "default": p.default, "enum": p.enum, "ui_label": p.ui_label,
         "ui_options": p.ui_options, "ui_options_from": p.ui_options_from,
         "ui_option_label": p.ui_option_label,
+        "ui_default_label": p.ui_default_label,
+        "ui_min": p.ui_min, "ui_max": p.ui_max,
     }
 
 

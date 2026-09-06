@@ -17,3 +17,11 @@ def test_every_widget_param_named_heading_not_taric():
 def test_tool_set_builds():
     ts = build_tool_set(WIDGETS, con=None)
     assert len(ts["defs"]) == 5
+
+
+def test_months_param_carries_ui_bounds():
+    months = next(
+        p for w in WIDGETS for p in w.params if p.name == "months"
+    )
+    assert months.ui_min == 6
+    assert months.ui_max == 36

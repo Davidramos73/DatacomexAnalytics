@@ -82,6 +82,21 @@ _PROMPTS = [
     "¿Cuánto calzado deportivo importamos de Vietnam?",
 ]
 
+_COPY = {
+    "empty_title": "¿Qué miramos del calzado?",
+    "empty_text": (
+        "Pregunta por importaciones, exportaciones, socios comerciales, "
+        "mix de producto o precios de calzado."
+    ),
+    "placeholder": "Pregunta sobre el calzado…",
+    "hint_html": (
+        "Respuestas generadas por IA a partir de datos oficiales "
+        "DataComex (cap. 64, calzado) · pueden contener errores, verifica "
+        'cifras críticas · <a href="#" data-role="hint-tab">ver panel de '
+        "reportes</a>"
+    ),
+}
+
 _THEMES = [
     "lumen", "default", "macarons", "vintage", "westeros",
     "roma", "shine", "walden", "chalk", "dark",
@@ -110,6 +125,7 @@ class FootwearDomain:
                     filters=["flow", "heading", "months"],
                 )
             ],
+            copy=dict(_COPY),
         )
 
     def open_connection(self):

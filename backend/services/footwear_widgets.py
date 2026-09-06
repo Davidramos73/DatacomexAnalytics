@@ -14,8 +14,11 @@ _FLOW = Param(
 _HEADING = Param(
     "heading", "str", default="64", ui_label="Partida",
     ui_options_from="headings", ui_option_label="{code} — {description}",
+    ui_default_label="Todo el calzado (cap. 64)",
 )
-_MONTHS = Param("months", "int", default=24, ui_label="Meses")
+_MONTHS = Param(
+    "months", "int", default=24, ui_label="Meses", ui_min=6, ui_max=36,
+)
 
 WIDGETS: list[Widget] = [
     Widget(

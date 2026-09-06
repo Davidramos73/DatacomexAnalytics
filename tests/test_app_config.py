@@ -56,3 +56,22 @@ def test_app_config_pins_downstream_shape(client):
     params = body["widgets"]["evolution"]["params"]
     assert isinstance(params, list)
     assert all(p["name"] != "chart_type" for p in params)
+
+
+def test_app_config_carries_ui_copy(client):
+    copy = client.get("/api/app-config").json()["copy"]
+    assert copy["empty_title"] == "¿Qué miramos del calzado?"
+    assert copy["placeholder"] == "Pregunta sobre el calzado…"
+    assert copy["empty_text"].startswith("Pregunta por importaciones")
+    # the tab link must stay wired through boot's data-role anchor
+    assert 'data-role="hint-tab"' in copy["hint_html"]
+    assert "DataComex (cap. 64, calzado)" in copy["hint_html"]
+
+
+def test_app_config_months_carries_ui_bounds(client):
+    params = client.get("/api/app-config").json()["widgets"]["evolution"]["params"]
+    months = next(p for p in params if p["name"] == "months")
+    assert months["ui_min"] == 6
+    assert months["ui_max"] == 36
+    heading = next(p for p in params if p["name"] == "heading")
+    assert heading["ui_default_label"] == "Todo el calzado (cap. 64)"

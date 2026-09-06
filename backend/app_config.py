@@ -43,6 +43,7 @@ def build_app_config(domain: Domain) -> dict:
         "example_prompts": list(cfg.example_prompts),
         "echarts_themes": list(cfg.echarts_themes),
         "tabs": [dataclass_to_dict(t) for t in cfg.tabs],
+        "copy": dict(cfg.copy),
         "widgets": descs,
         "filter_options": fopts,
     }
