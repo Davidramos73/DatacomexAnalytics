@@ -59,7 +59,25 @@
   .menu-pop button:hover{background:rgba(0,0,0,.05)}
   .menu-pop button.danger{color:#b3261e}
   .menu-pop button.danger:hover{background:rgba(179,38,30,.08)}
-  .sb-foot{flex:none;padding:9px 12px;border-top:1px solid rgba(0,0,0,.07);font-size:11px;color:#9a968f;white-space:nowrap;overflow:hidden}
+  .sb-note{flex:none;padding:8px 14px 4px;font-size:11px;color:#9a968f;white-space:nowrap;overflow:hidden}
+  .sb-user{flex:none;position:relative;padding:8px 10px 10px;border-top:1px solid rgba(0,0,0,.07)}
+  .sb-user-row{display:flex;align-items:center;gap:9px;width:100%;padding:6px;border:none;background:transparent;border-radius:9px;cursor:pointer;font-family:inherit;text-align:left}
+  .sb-user-row:hover{background:rgba(0,0,0,.05)}
+  .sb-avatar{flex:none;width:28px;height:28px;border-radius:50%;background:#3a53c9;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;letter-spacing:.02em}
+  .sb-user-name{flex:1;min-width:0;font-size:12.5px;color:#2c2a27;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sb-user-chev{flex:none;color:#9a968f;transition:transform .15s}
+  .sb-user.open .sb-user-chev{transform:rotate(180deg)}
+  .sidebar.collapsed .sb-note{display:none}
+  .sidebar.collapsed .sb-user{padding:8px}
+  .sidebar.collapsed .sb-user-row{justify-content:center;padding:6px 0}
+  .sidebar.collapsed .sb-user-name,.sidebar.collapsed .sb-user-chev{display:none}
+  .sb-user-pop{position:absolute;left:10px;right:10px;bottom:56px;z-index:40;padding:5px;background:#fff;border:1px solid rgba(0,0,0,.09);border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.16)}
+  .sidebar.collapsed .sb-user-pop{left:8px;right:auto;bottom:8px;width:190px}
+  .sb-user-pop .head{padding:8px 9px 9px;border-bottom:1px solid rgba(0,0,0,.07);margin-bottom:4px}
+  .sb-user-pop .head b{display:block;font-size:12.5px;color:#1c1b19;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sb-user-pop .head span{display:block;font-size:11px;color:#8b8781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .sb-user-pop button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 9px;border:none;background:transparent;border-radius:7px;font-size:12.5px;color:#b3261e;cursor:pointer;font-family:inherit;text-align:left}
+  .sb-user-pop button:hover{background:rgba(179,38,30,.08)}
 
   /* main */
   main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -180,7 +198,8 @@
       </div>
     </div>
     <div class="sb-list sb-hideable" id="chatList"></div>
-    <div class="sb-foot sb-hideable">Guardado en este navegador</div>
+    <div class="sb-note sb-hideable">Guardado en este navegador</div>
+    <div class="sb-user" id="sbUser"></div>
   </aside>
 
   <main>
@@ -913,21 +932,62 @@ themeSel.addEventListener("change", () => {
   renderThread();
 });
 
-function renderUser(user) {
-  const foot = $(".sb-foot");
-  foot.style.cssText = "flex:none;padding:9px 12px;border-top:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:8px;font-size:11px;color:#6b6864";
-  foot.innerHTML = "";
-  const name = el("span", null, user.name || user.email);
-  name.style.cssText = "flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-  const out = el("button", null, "Salir");
-  out.style.cssText = "border:none;background:transparent;color:#3a53c9;font-size:11px;cursor:pointer;font-family:inherit;padding:0";
-  out.onclick = async () => {
-    try { await fetch("/auth/logout", { method: "POST" }); } catch (e) {}
-    location.href = "/login.html";
-  };
-  foot.appendChild(name);
-  foot.appendChild(out);
+function userInitials(user) {
+  const src = (user.name || user.email || "?").trim();
+  const parts = src.split(/[\s@._-]+/).filter(Boolean);
+  const letters = parts.length >= 2
+    ? parts[0][0] + parts[1][0]
+    : src.slice(0, 2);
+  return letters.toUpperCase();
 }
+
+let userMenuOpen = false;
+
+function renderUser(user) {
+  const host = $("#sbUser");
+  host.classList.toggle("open", userMenuOpen);
+  host.innerHTML = "";
+
+  const row = el("button", "sb-user-row");
+  row.title = user.email || "";
+  row.appendChild(el("div", "sb-avatar", esc(userInitials(user))));
+  row.appendChild(el("div", "sb-user-name", esc(user.name || user.email)));
+  row.innerHTML += '<svg class="sb-user-chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+  row.onclick = e => { e.stopPropagation(); userMenuOpen = !userMenuOpen; renderUser(user); };
+  host.appendChild(row);
+
+  if (userMenuOpen) {
+    const pop = el("div", "sb-user-pop");
+    const head = el("div", "head");
+    head.appendChild(el("b", null, esc(user.name || user.email)));
+    if (user.name) head.appendChild(el("span", null, esc(user.email)));
+    pop.appendChild(head);
+    const out = el("button", null,
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14H3V2h3M10.5 11l3-3-3-3M13.5 8H6"/></svg>Cerrar sesión');
+    out.onclick = async e => {
+      e.stopPropagation();
+      try { await fetch("/auth/logout", { method: "POST" }); } catch (e) {}
+      location.href = "/login.html";
+    };
+    pop.appendChild(out);
+    host.appendChild(pop);
+  }
+}
+
+document.addEventListener("click", e => {
+  if (userMenuOpen && !e.target.closest("#sbUser")) {
+    userMenuOpen = false;
+    const host = $("#sbUser");
+    if (host) host.classList.remove("open"), host.querySelector(".sb-user-pop")?.remove();
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && userMenuOpen) {
+    userMenuOpen = false;
+    const host = $("#sbUser");
+    if (host) host.classList.remove("open"), host.querySelector(".sb-user-pop")?.remove();
+  }
+});
 
 (async () => {
   try {
