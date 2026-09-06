@@ -27,7 +27,15 @@ from backend.routers import reports
 DOMAIN = FootwearDomain() if config.CHAT_DOMAIN == "footwear" else SqlDomain()
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
-_PUBLIC = ("/login.html", "/auth/", "/favicon", "/healthz", "/api/app-config")
+_PUBLIC = (
+    "/login.html",
+    "/chatkit.css",
+    "/app.css",
+    "/auth/",
+    "/favicon",
+    "/healthz",
+    "/api/app-config",
+)
 
 app = FastAPI(title="Agent Chat Analytics")
 app.include_router(auth_router.router)
