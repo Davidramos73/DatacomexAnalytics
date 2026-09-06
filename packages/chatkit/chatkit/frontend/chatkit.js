@@ -619,8 +619,8 @@ export function mountWidgetGrid(host, cfg = {}) {
         card.appendChild(chartHost);
         const m = spec.meta || {};
         card.appendChild(el("div", "rp-meta",
-          esc([m.unit && "unidad " + m.unit, m.granularity, m.is_provisional && "· datos provisionales"]
-            .filter(Boolean).join(" "))));
+          esc([m.unit && "unidad " + m.unit, m.granularity, ...(m.notes || [])]
+            .filter(Boolean).join(" · "))));
 
         const t = themeOf();
         const inst = echarts.init(chartHost, t === "default" ? null : t, { renderer: "svg" });

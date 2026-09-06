@@ -4,7 +4,7 @@ from chatkit.sql_domain import SqlDomain
 def test_widgets_empty_and_query_tool_present():
     d = SqlDomain()
     assert d.widgets() == []
-    assert d.extra_tools()["defs"][0]["name"] == "query_data"
+    assert d.extra_tools(None)["defs"][0]["name"] == "query_data"
 
 
 def test_app_config_minimal():

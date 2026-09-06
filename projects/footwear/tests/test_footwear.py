@@ -274,6 +274,7 @@ def test_avg_price_is_value_over_weight_per_period(con):
     assert out["widget"] == "avg_price"
     assert out["echarts"]["series"][0]["data"] == [20.0, 30.0]
     assert out["echarts"]["yAxis"]["name"] == "€/kg"
+    assert isinstance(out["meta"]["notes"], list)
 
 
 def test_avg_price_guards_against_zero_weight(con):
@@ -316,6 +317,7 @@ def test_balance_monthly_saldo_and_cumulative(con):
     assert series["Saldo"] == [20.0, -20.0]          # 30-10, 5-25
     assert series["Acumulado"] == [20.0, 0.0]        # running sum
     assert {s["type"] for s in out["echarts"]["series"]} == {"bar", "line"}
+    assert isinstance(out["meta"]["notes"], list)
 
 
 def test_balance_saldo_accepts_line_chart_type(con):

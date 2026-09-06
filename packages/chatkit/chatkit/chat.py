@@ -17,7 +17,7 @@ def run_chat(domain: Domain, user_message: str, sink, *, history=None) -> None:
         prior = clean_history(history)
         sink(events.Thinking(label="Consultando datos"))
 
-        extra = domain.extra_tools() or {"defs": [], "handlers": {}}
+        extra = domain.extra_tools(con) or {"defs": [], "handlers": {}}
         wt = build_tool_set(domain.widgets(), con)
         defs = extra["defs"] + wt["defs"]
         handlers = {**extra["handlers"], **wt["handlers"]}

@@ -134,13 +134,9 @@ class FootwearDomain:
     def widgets(self):
         return WIDGETS
 
-    def extra_tools(self) -> dict:
+    def extra_tools(self, con) -> dict:
         def resolve_footwear_product(term: str) -> str:
-            con = self.open_connection()
-            try:
-                return json.dumps({"heading": footwear.resolve_taric(con, term)})
-            finally:
-                con.close()
+            return json.dumps({"heading": footwear.resolve_taric(con, term)})
 
         return {
             "defs": [_RESOLVE_DEF],

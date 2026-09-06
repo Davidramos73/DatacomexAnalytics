@@ -18,7 +18,7 @@ class FakeDomain:
     def widgets(self):
         return []
 
-    def extra_tools(self):
+    def extra_tools(self, con):
         return {"defs": [], "handlers": {}}
 
     def report_prefix(self):

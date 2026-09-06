@@ -355,7 +355,7 @@ def avg_price(
             ],
         },
         "kpis": [kpi],
-        "meta": {"unit": "EUR/kg", "granularity": "monthly"},
+        "meta": {"unit": "EUR/kg", "granularity": "monthly", "notes": []},
     }
 
 
@@ -412,5 +412,5 @@ def balance(
         "kpis": [
             {"label": "Saldo acumulado", "value": f"{total:+.1f} M€", "tone": tone}
         ],
-        "meta": {"unit": "EUR", "granularity": "monthly"},
+        "meta": {"unit": "EUR", "granularity": "monthly", "notes": []},
     }

@@ -137,7 +137,7 @@ class SqlDomain:
     def step_label(self, name: str, tool_input: dict):
         return None
 
-    def extra_tools(self) -> dict:
+    def extra_tools(self, con) -> dict:
         def query_data(question: str) -> str:
             result = answer_data_question(question, sink=lambda e: None)
             self._datasets.append(result)
