@@ -1,6 +1,14 @@
+import pytest
 from fastapi.testclient import TestClient
-from chatkit import app as app_module
+
+from chatkit import create_app, app as app_module
 from chatkit import events
+from chatkit._demo.domain import DemoDomain
+
+
+@pytest.fixture
+def client():
+    return TestClient(create_app(DemoDomain()))
 
 
 def _fake_run(domain, message, sink, **kw):
@@ -12,9 +20,8 @@ def _fake_run(domain, message, sink, **kw):
     sink(events.Done(seconds=0.1))
 
 
-def test_chat_streams_events(monkeypatch):
+def test_chat_streams_events(monkeypatch, client):
     monkeypatch.setattr(app_module, "run_chat", _fake_run)
-    client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat",
                        json={"session_id": "s1", "message": "hi"}) as r:
         assert r.status_code == 200
@@ -26,7 +33,7 @@ def test_chat_streams_events(monkeypatch):
     assert "event: done" in body
 
 
-def test_chat_forwards_history(monkeypatch):
+def test_chat_forwards_history(monkeypatch, client):
     seen = {}
 
     def capture(domain, message, sink, **kw):
@@ -35,7 +42,6 @@ def test_chat_forwards_history(monkeypatch):
         sink(events.Done(seconds=0.0))
 
     monkeypatch.setattr(app_module, "run_chat", capture)
-    client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat", json={
         "session_id": "s1", "message": "follow up",
         "history": [
@@ -51,11 +57,10 @@ def test_chat_forwards_history(monkeypatch):
     ]
 
 
-def test_chat_reports_errors(monkeypatch):
+def test_chat_reports_errors(monkeypatch, client):
     def boom(domain, message, sink, **kw):
         raise RuntimeError("kaboom")
     monkeypatch.setattr(app_module, "run_chat", boom)
-    client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat",
                        json={"session_id": "s", "message": "x"}) as r:
         body = "".join(r.iter_text())

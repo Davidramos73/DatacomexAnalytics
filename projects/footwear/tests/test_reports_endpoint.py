@@ -3,7 +3,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import chatkit.config as config
-from chatkit import app as app_module
+from chatkit import create_app
+from projects.footwear.domain import FootwearDomain
 from projects.footwear.warehouse.schema import HEADINGS, SCHEMA_DDL
 
 
@@ -30,7 +31,7 @@ def client(tmp_path, monkeypatch):
         ],
     )
     c.close()
-    yield TestClient(app_module.app)
+    yield TestClient(create_app(FootwearDomain()))
 
 
 def test_evolution_endpoint(client):

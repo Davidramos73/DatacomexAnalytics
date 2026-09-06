@@ -60,12 +60,13 @@ DATA_COMEX_TOKEN = os.environ.get("DATA_COMEX_TOKEN", "")
 # Where the footwear (DataComex) warehouse the app reads lives. In prod, point
 # this at the same persistent volume as AUTH_DB_PATH so `build_warehouse`
 # refreshes survive redeploys without rebuilding the image.
-# TODO(4.3): DATACOMEX_* belong to projects/footwear, not chatkit.
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+# TODO(4.3): move to projects/footwear/config.py — DATACOMEX_* belong to the
+# footwear project, not chatkit. The package-relative default is deliberately
+# wrong-but-not-crashing until then.
 DATACOMEX_PATH = Path(
     os.environ.get(
         "DATACOMEX_PATH",
-        str(_REPO_ROOT / "projects" / "footwear" / "warehouse" / "footwear.duckdb"),
+        str(Path(__file__).parent / "warehouse" / "footwear.duckdb"),
     )
 )
 

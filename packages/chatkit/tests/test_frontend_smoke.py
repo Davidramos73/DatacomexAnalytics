@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
-from chatkit import app as app_module
 
-client = TestClient(app_module.app)
+from chatkit import create_app
+from chatkit._demo.domain import DemoDomain
+
+client = TestClient(create_app(DemoDomain()))
 
 
 def test_stylesheets_served_with_tokens():
@@ -15,7 +17,7 @@ def test_index_is_thin_and_imports_module():
     html = client.get("/").text
     assert 'type="module"' in html
     assert "/_chatkit/chatkit.js" in html
-    assert len(html) < 4000  # the shell is thin now
+    assert len(html) < 4000  # the shell is thin
     js = client.get("/_chatkit/chatkit.js")
     assert js.status_code == 200
     assert "export function boot" in js.text or "export async function boot" in js.text
@@ -26,4 +28,4 @@ def test_login_is_thin_and_imports_module():
     assert 'type="module"' in html
     assert "mountLogin" in html
     assert "accounts.google.com/gsi/client" in html
-    assert "<script>" not in html  # no inline logic left
+    assert "<script>" not in html  # no inline logic

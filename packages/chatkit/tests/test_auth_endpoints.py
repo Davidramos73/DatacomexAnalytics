@@ -1,17 +1,19 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from chatkit import app as app_module
+import chatkit.config as config
+from chatkit import create_app
+from chatkit._demo.domain import DemoDomain
 from chatkit.auth import google as auth
 from chatkit.auth import router as auth_router
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(app_module.config, "AUTH_ENABLED", True)
+    monkeypatch.setattr(config, "AUTH_ENABLED", True)
     monkeypatch.setattr(auth.config, "ALLOWED_EMAILS", {"ok@x.com"})
     monkeypatch.setattr(auth_router.auth_db.config, "AUTH_DB_PATH", tmp_path / "a.sqlite")
-    return TestClient(app_module.app)
+    return TestClient(create_app(DemoDomain()), base_url="https://testserver")
 
 
 def _login_as(monkeypatch, client, email, name="U"):
@@ -84,7 +86,7 @@ def test_login_page_and_auth_config_are_public(client):
 
 
 def test_gate_open_when_auth_disabled(monkeypatch):
-    monkeypatch.setattr(app_module.config, "AUTH_ENABLED", False)
-    c = TestClient(app_module.app)
+    monkeypatch.setattr(config, "AUTH_ENABLED", False)
+    c = TestClient(create_app(DemoDomain()), base_url="https://testserver")
     assert c.get("/", follow_redirects=False).status_code == 200
     assert c.get("/auth/me").json()["email"] == "dev@localhost"
