@@ -8,9 +8,10 @@ import json
 from pathlib import Path
 
 import backend.config as config
-from backend import charts, events
+from backend import charts
 from backend.agents import llm
 from backend.agents.data_agent import answer_data_question
+from backend.domain import AppConfig, Branding
 from backend.config import LLM_MODEL
 from backend.warehouse import db
 
@@ -105,8 +106,18 @@ class SqlDomain:
     def __init__(self) -> None:
         self._datasets: list = []
 
-    def app_config(self):  # pragma: no cover - not used by free-SQL chat
-        raise NotImplementedError
+    def app_config(self) -> AppConfig:
+        return AppConfig(
+            branding=Branding(
+                name="Analytics",
+                short_name="Analytics",
+                badge="SQL",
+                favicon="📊",
+            ),
+            example_prompts=[],
+            echarts_themes=["lumen", "default"],
+            tabs=[],
+        )
 
     def open_connection(self):
         return db.connect()

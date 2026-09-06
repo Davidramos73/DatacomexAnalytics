@@ -7,6 +7,12 @@ def test_widgets_empty_and_query_tool_present():
     assert d.extra_tools()["defs"][0]["name"] == "query_data"
 
 
+def test_app_config_minimal():
+    cfg = SqlDomain().app_config()
+    assert cfg.branding.name
+    assert cfg.tabs == []
+
+
 def test_finalize_builds_envelope_from_dataset(monkeypatch):
     d = SqlDomain()
     from backend.agents.data_agent import DataResult
