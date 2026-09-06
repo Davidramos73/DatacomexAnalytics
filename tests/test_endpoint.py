@@ -3,7 +3,7 @@ from backend import app as app_module
 from backend import events
 
 
-def _fake_run(message, sink, **kw):
+def _fake_run(domain, message, sink, **kw):
     sink(events.Thinking(label="Reading schema"))
     sink(events.Step(label="sql.query", detail="SELECT 1"))
     sink(events.Text(text="hello"))
@@ -13,7 +13,7 @@ def _fake_run(message, sink, **kw):
 
 
 def test_chat_streams_events(monkeypatch):
-    monkeypatch.setattr(app_module, "orchestrator_run", _fake_run)
+    monkeypatch.setattr(app_module, "run_chat", _fake_run)
     client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat",
                        json={"session_id": "s1", "message": "hi"}) as r:
@@ -29,12 +29,12 @@ def test_chat_streams_events(monkeypatch):
 def test_chat_forwards_history(monkeypatch):
     seen = {}
 
-    def capture(message, sink, **kw):
+    def capture(domain, message, sink, **kw):
         seen["message"] = message
         seen["history"] = kw.get("history")
         sink(events.Done(seconds=0.0))
 
-    monkeypatch.setattr(app_module, "orchestrator_run", capture)
+    monkeypatch.setattr(app_module, "run_chat", capture)
     client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat", json={
         "session_id": "s1", "message": "follow up",
@@ -52,9 +52,9 @@ def test_chat_forwards_history(monkeypatch):
 
 
 def test_chat_reports_errors(monkeypatch):
-    def boom(message, sink, **kw):
+    def boom(domain, message, sink, **kw):
         raise RuntimeError("kaboom")
-    monkeypatch.setattr(app_module, "orchestrator_run", boom)
+    monkeypatch.setattr(app_module, "run_chat", boom)
     client = TestClient(app_module.app)
     with client.stream("POST", "/api/chat",
                        json={"session_id": "s", "message": "x"}) as r:

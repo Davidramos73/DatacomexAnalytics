@@ -17,16 +17,13 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import backend.config as config
 from backend import events
-from backend.agents import orchestrator, orchestrator_footwear
+from backend.chat import run_chat
+from backend.footwear_domain import FootwearDomain
+from backend.sql_domain import SqlDomain
 from backend.routers import auth as auth_router
 from backend.routers import reports
 
-# indirection for tests; pick the chat domain at import time
-orchestrator_run = (
-    orchestrator_footwear.run
-    if config.CHAT_DOMAIN == "footwear"
-    else orchestrator.run
-)
+DOMAIN = FootwearDomain() if config.CHAT_DOMAIN == "footwear" else SqlDomain()
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _PUBLIC = ("/login.html", "/auth/", "/favicon", "/healthz")
@@ -99,7 +96,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
 
     def worker() -> None:
         try:
-            orchestrator_run(req.message, sink, history=history)
+            run_chat(DOMAIN, req.message, sink, history=history)
         except Exception as exc:  # noqa: BLE001 - reported to the client
             q.put(events.ErrorEvent(message=str(exc)))
             q.put(events.Done(seconds=0.0))
