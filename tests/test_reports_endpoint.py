@@ -86,7 +86,15 @@ def test_balance_endpoint(client):
 
 
 def test_index_hosts_the_reports_view(client):
+    # The shell is now thin: the reports tab and its widget REST paths are
+    # described by /api/app-config and rendered by chatkit.js.
     r = client.get("/")
     assert r.status_code == 200
-    assert 'id="reportsView"' in r.text
-    assert "/api/v1/reports/footwear/" in r.text
+    assert 'import { boot } from "/chatkit.js"' in r.text
+
+    cfg = client.get("/api/app-config").json()
+    tab = next(t for t in cfg["tabs"] if t["id"] == "reports")
+    assert tab["kind"] == "widget_grid"
+    assert cfg["widgets"][tab["widgets"][0]]["rest_path"].startswith(
+        "/api/v1/reports/footwear/"
+    )

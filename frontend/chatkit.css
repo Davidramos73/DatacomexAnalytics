@@ -136,8 +136,10 @@
   .chips button:hover{border-color:rgba(0,0,0,.28);background:#fffdfa}
 
   /* views */
-  #chatView,#reportsView{flex:1;min-height:0;display:flex;flex-direction:column}
-  #chatView[hidden],#reportsView[hidden]{display:none}
+  .ck-view{flex:1;min-height:0;display:flex;flex-direction:column}
+  .ck-view[hidden]{display:none}
+  .sb-tabs{display:flex;flex-direction:column;gap:8px}
+  .sb-tabs:empty{display:none}
   .sb-nav.active{background:var(--accent-hover);border-color:var(--accent-hover)}
 
   /* reports view */

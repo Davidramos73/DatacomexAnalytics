@@ -30,6 +30,7 @@ _FRONTEND = Path(__file__).parent.parent / "frontend"
 _PUBLIC = (
     "/login.html",
     "/chatkit.css",
+    "/chatkit.js",
     "/app.css",
     "/auth/",
     "/favicon",
