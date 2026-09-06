@@ -5,7 +5,7 @@ client = TestClient(app_module.app)
 
 
 def test_stylesheets_served_with_tokens():
-    css = client.get("/chatkit.css")
+    css = client.get("/_chatkit/chatkit.css")
     assert css.status_code == 200
     assert "--accent" in css.text
     assert client.get("/app.css").status_code == 200
@@ -14,9 +14,9 @@ def test_stylesheets_served_with_tokens():
 def test_index_is_thin_and_imports_module():
     html = client.get("/").text
     assert 'type="module"' in html
-    assert "chatkit.js" in html
+    assert "/_chatkit/chatkit.js" in html
     assert len(html) < 4000  # the shell is thin now
-    js = client.get("/chatkit.js")
+    js = client.get("/_chatkit/chatkit.js")
     assert js.status_code == 200
     assert "export function boot" in js.text or "export async function boot" in js.text
 

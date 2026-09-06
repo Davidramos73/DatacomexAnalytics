@@ -7,6 +7,7 @@ from chatkit import events
 from chatkit.agents import llm
 from chatkit.config import DATA_AGENT_MODEL
 from chatkit.warehouse import duckdb as db
+# TODO(4.3): split generic schema fns out of _demo
 from chatkit._demo import schema
 
 _SYSTEM = """\

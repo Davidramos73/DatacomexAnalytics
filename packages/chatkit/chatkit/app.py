@@ -30,10 +30,10 @@ DOMAIN = FootwearDomain() if config.CHAT_DOMAIN == "footwear" else SqlDomain()
 
 # TODO(4.4): the domain supplies its own web_dir(); this hardcodes footwear.
 _FRONTEND = Path(__file__).resolve().parents[3] / "projects" / "footwear" / "web"
+_CHATKIT_FRONTEND = Path(__file__).parent / "frontend"
 _PUBLIC = (
     "/login.html",
-    "/chatkit.css",
-    "/chatkit.js",
+    "/_chatkit/",
     "/app.css",
     "/auth/",
     "/favicon",
@@ -44,6 +44,11 @@ _PUBLIC = (
 app = FastAPI(title="Agent Chat Analytics")
 app.include_router(auth_router.router)
 app.include_router(reports.router)
+app.mount(
+    "/_chatkit",
+    StaticFiles(directory=str(_CHATKIT_FRONTEND)),
+    name="chatkit-assets",
+)
 
 
 @app.middleware("http")

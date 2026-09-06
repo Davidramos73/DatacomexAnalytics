@@ -90,7 +90,7 @@ def test_index_hosts_the_reports_view(client):
     # described by /api/app-config and rendered by chatkit.js.
     r = client.get("/")
     assert r.status_code == 200
-    assert 'import { boot } from "/chatkit.js"' in r.text
+    assert 'import { boot } from "/_chatkit/chatkit.js"' in r.text
 
     cfg = client.get("/api/app-config").json()
     tab = next(t for t in cfg["tabs"] if t["id"] == "reports")

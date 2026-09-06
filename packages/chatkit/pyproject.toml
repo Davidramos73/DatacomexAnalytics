@@ -19,4 +19,4 @@ where = ["."]
 include = ["chatkit*"]
 
 [tool.setuptools.package-data]
-chatkit = ["frontend/*"]
+chatkit = ["frontend/*", "_demo/web/*"]
