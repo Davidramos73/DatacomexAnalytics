@@ -815,15 +815,15 @@ async function send() {
 /* ---------- reports view ---------- */
 const REPORT_WIDGETS = [
   { key: "evolution", half: false,
-    url: f => `/api/v1/reports/footwear/evolution?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
+    url: f => `/api/v1/reports/footwear/evolution?flow=${f.flow}&heading=${f.taric}&months=${f.months}` },
   { key: "countries", half: false,
-    url: f => `/api/v1/reports/footwear/countries?flow=${f.flow}&taric=${f.taric}&top_n=10` },
+    url: f => `/api/v1/reports/footwear/countries?flow=${f.flow}&heading=${f.taric}&top_n=10` },
   { key: "mix", half: true,
     url: f => `/api/v1/reports/footwear/product-mix?flow=${f.flow}` },
   { key: "price", half: true,
-    url: f => `/api/v1/reports/footwear/avg-price?flow=${f.flow}&taric=${f.taric}&months=${f.months}` },
+    url: f => `/api/v1/reports/footwear/avg-price?flow=${f.flow}&heading=${f.taric}&months=${f.months}` },
   { key: "balance", half: false,
-    url: f => `/api/v1/reports/footwear/balance?taric=${f.taric}&months=${f.months}` },
+    url: f => `/api/v1/reports/footwear/balance?heading=${f.taric}&months=${f.months}` },
 ];
 const rpCharts = {};
 let rpInited = false;

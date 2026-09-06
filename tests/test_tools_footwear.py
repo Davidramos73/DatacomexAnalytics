@@ -50,7 +50,7 @@ def test_market_overview_handler_returns_a_chart_envelope(con):
     assert out["echarts"]["series"][0]["type"] == "line"
 
 
-def test_top_partners_handler_uppercases_flow(con):
+def test_top_partners_handler_returns_ranked_countries(con):
     impls = tools_footwear.handlers(con)
     out = json.loads(impls["footwear_top_partners"](flow="IMPORT", top_n=5))
     assert out["echarts"]["yAxis"]["data"] == ["Vietnam", "China"]
