@@ -38,3 +38,21 @@ def test_app_config_public_and_shaped(client):
     assert body["widgets"]["evolution"]["rest_path"].endswith("/evolution")
     assert body["widgets"]["evolution"]["rest_path"].startswith("/api/v1/reports/footwear")
     assert isinstance(body["example_prompts"], list) and body["example_prompts"]
+
+
+def test_app_config_pins_downstream_shape(client):
+    body = client.get("/api/app-config").json()
+
+    fopts = body["filter_options"]
+    assert set(fopts) == {"periods", "headings", "countries"}
+    assert fopts["periods"] == ["2024-01"]
+    assert fopts["countries"] == ["China"]
+
+    assert set(body["auth"]) == {"client_id", "enabled"}
+
+    tab = body["tabs"][0]
+    assert "widgets" in tab and "filters" in tab
+
+    params = body["widgets"]["evolution"]["params"]
+    assert isinstance(params, list)
+    assert all(p["name"] != "chart_type" for p in params)
