@@ -1,4 +1,13 @@
-from backend.widgets import Param, Widget, chart_type_param, widget_descriptors
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from backend.widgets import (
+    Param,
+    Widget,
+    build_rest_router,
+    chart_type_param,
+    widget_descriptors,
+)
 
 
 def _noop(con):
@@ -40,3 +49,26 @@ def test_widget_descriptors_shape():
     names = [p["name"] for p in d["params"]]
     assert names == ["flow", "months"]          # chart_type dropped
     assert d["params"][0]["ui_options"][0]["label"] == "Importaciones"
+
+
+def test_build_rest_router_calls_fn_with_params():
+    seen = {}
+
+    def evo(con, *, flow, months=24):
+        seen["flow"] = flow
+        seen["months"] = months
+        return {"widget": "evolution", "title": "t", "echarts": {}, "kpis": [], "meta": {}}
+
+    w = Widget(key="evolution", fn=evo, rest_path="/evolution",
+               tool_name="mo", tool_description="d",
+               params=[Param("flow", "enum", required=True, enum=["IMPORT", "EXPORT"]),
+                       Param("months", "int", default=24)])
+    app = FastAPI()
+    app.include_router(build_rest_router([w], prefix="/r", con_factory=lambda: None))
+    client = TestClient(app)
+
+    r = client.get("/r/evolution", params={"flow": "IMPORT", "months": 6})
+    assert r.status_code == 200
+    assert seen == {"flow": "IMPORT", "months": 6}
+
+    assert client.get("/r/evolution", params={"flow": "NOPE"}).status_code == 422

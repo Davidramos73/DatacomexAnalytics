@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import dataclasses
-from typing import Any, Callable, Literal
+import inspect
+from typing import Any, Callable, Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 ParamType = Literal["enum", "int", "str", "period"]
 
@@ -63,3 +67,81 @@ def widget_descriptors(widgets: list[Widget]) -> dict[str, dict]:
             ],
         }
     return out
+
+
+_PY_TYPE = {"enum": str, "str": str, "period": str, "int": int}
+
+
+def _dependency(con_factory):
+    def _dep():
+        con = con_factory()
+        try:
+            yield con
+        finally:
+            close = getattr(con, "close", None)
+            if callable(close):
+                with contextlib.suppress(Exception):
+                    close()
+
+    return _dep
+
+
+def _query_parser(w: Widget):
+    params = [p for p in w.params if p.name != "chart_type"]
+
+    def parse(**kwargs):
+        out = {}
+        for p in params:
+            val = kwargs.get(p.name)
+            if val is None:
+                if p.required:
+                    raise HTTPException(422, f"missing required param {p.name}")
+                continue
+            if p.type == "enum" and p.enum and val not in p.enum:
+                raise HTTPException(422, f"{p.name} must be one of {p.enum}")
+            out[p.name] = val
+        return out
+
+    sig_params = []
+    for p in params:
+        py = _PY_TYPE[p.type]
+        if p.required:
+            default = Query(...)
+            annotation = py
+        else:
+            default = Query(p.default)
+            annotation = Optional[py]
+        sig_params.append(
+            inspect.Parameter(
+                p.name,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=default,
+                annotation=annotation,
+            )
+        )
+    parse.__signature__ = inspect.Signature(sig_params)
+    return parse
+
+
+def _make_endpoint(w: Widget, dep):
+    parser = _query_parser(w)
+
+    def endpoint(request_params: dict = Depends(parser), con=Depends(dep)):
+        return w.fn(con, **request_params)
+
+    return endpoint
+
+
+def build_rest_router(
+    widgets: list[Widget], *, prefix: str, con_factory: Callable[[], Any]
+) -> APIRouter:
+    router = APIRouter(prefix=prefix)
+    dep = _dependency(con_factory)
+    for w in widgets:
+        router.add_api_route(
+            w.rest_path,
+            _make_endpoint(w, dep),
+            methods=["GET"],
+            name=w.key,
+        )
+    return router
