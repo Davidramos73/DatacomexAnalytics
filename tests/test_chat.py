@@ -1,7 +1,6 @@
-import json
 import backend.chat as chat_mod
 from backend import events
-from backend.agents.llm import AgentResult, ToolCall
+from backend.agents.llm import AgentResult
 from backend.domain import Branding, AppConfig
 
 
@@ -64,6 +63,35 @@ def test_run_chat_emits_ordered_events(monkeypatch):
     text = next(e for e in events_seen if e.type == "text")
     assert text.text == "Las exportaciones subieron."
 
+    # Full relative order: last delta -> chart.render step -> text -> chart -> done
+    last_delta = max(i for i, e in enumerate(events_seen) if e.type == "delta")
+    render_step = next(i for i, e in enumerate(events_seen)
+                       if getattr(e, "label", None) == "chart.render")
+    text_i = next(i for i, e in enumerate(events_seen) if e.type == "text")
+    chart_i = next(i for i, e in enumerate(events_seen) if e.type == "chart")
+    done_i = next(i for i, e in enumerate(events_seen) if e.type == "done")
+    assert last_delta < render_step < text_i < chart_i < done_i
+
+
+def test_run_chat_hit_limit_appends_note_and_meta_join(monkeypatch):
+    d = FakeDomain()
+    d.finalize = lambda agent, con: {
+        "title": "t", "echarts": {"x": 1},
+        "kpis": [{"label": "Var", "value": "+5%", "tone": "positive"}],
+        "meta": {"notes": ["nota previa"]},
+        "data": {"columns": ["a"], "rows": [[1]]},
+    }
+    monkeypatch.setattr(chat_mod.llm, "run_agent",
+                        lambda **kw: AgentResult("", [], [], 1, True))
+    monkeypatch.setattr(chat_mod.llm, "stream_text", lambda **kw: iter(["ok"]))
+    seen = []
+    chat_mod.run_chat(d, "hi", seen.append)
+
+    chart = next(e for e in seen if e.type == "chart")
+    assert "Var: +5%" in chart.meta
+    assert "nota previa" in chart.meta
+    assert "respuesta truncada: se alcanzó el límite de pasos" in chart.meta
+
 
 def test_run_chat_no_envelope_still_finishes(monkeypatch):
     d = FakeDomain()
@@ -75,3 +103,4 @@ def test_run_chat_no_envelope_still_finishes(monkeypatch):
     chat_mod.run_chat(d, "hi", seen.append)
     assert [e.type for e in seen][-1] == "done"
     assert not any(e.type == "chart" for e in seen)
+    assert not any(e.type == "error" for e in seen)
