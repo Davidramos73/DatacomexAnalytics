@@ -1,9 +1,14 @@
 services:
-  lumen:
+  app:
     build: .
-    image: lumen-analyst
+    image: footwear-analyst
     ports:
       - "8000:8000"
     env_file:
       - .env
+    volumes:
+      - datacomex-data:/app/data
     restart: unless-stopped
+
+volumes:
+  datacomex-data:

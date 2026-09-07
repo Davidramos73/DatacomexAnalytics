@@ -1,0 +1,101 @@
+import duckdb
+import pytest
+from fastapi.testclient import TestClient
+
+import chatkit.config as config
+from chatkit import create_app
+from projects.footwear.domain import FootwearDomain
+from projects.footwear.warehouse.schema import HEADINGS, SCHEMA_DDL
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    db_path = tmp_path / "dc.duckdb"
+    monkeypatch.setattr(config, "DATACOMEX_PATH", db_path)
+    c = duckdb.connect(str(db_path))
+    c.execute(SCHEMA_DDL)
+    c.executemany(
+        "INSERT INTO datacomex.taric_tree VALUES (?, ?, ?, ?)",
+        [("64", None, 2, "Calzado")]
+        + [(h, "64", 4, d) for h, (d, _) in HEADINGS.items()],
+    )
+    c.executemany(
+        "INSERT INTO datacomex.trade_flows VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            ("IMPORT", "2024-01", 2024, 1, "CHN", "China", "640411", "64", "6404",
+             50_000_000, 4_000_000, None, False),
+            ("IMPORT", "2024-02", 2024, 2, "CHN", "China", "640411", "64", "6404",
+             60_000_000, 5_000_000, None, False),
+            ("IMPORT", "2024-01", 2024, 1, "VNM", "Vietnam", "640411", "64", "6404",
+             20_000_000, 2_000_000, None, False),
+        ],
+    )
+    c.close()
+    yield TestClient(create_app(FootwearDomain()))
+
+
+def test_evolution_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/evolution", params={"flow": "IMPORT", "months": 12}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["widget"] == "monthly_evolution"
+    assert body["echarts"]["series"][0]["data"] == [70.0, 60.0]  # (50+20), 60
+
+
+def test_countries_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/countries", params={"flow": "IMPORT", "top_n": 5}
+    )
+    assert r.status_code == 200
+    assert r.json()["echarts"]["yAxis"]["data"] == ["Vietnam", "China"]
+
+
+def test_filter_options_endpoint(client):
+    r = client.get("/api/v1/reports/footwear/filters/options")
+    assert r.status_code == 200
+    assert r.json()["periods"] == ["2024-01", "2024-02"]
+
+
+def test_product_mix_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/product-mix", params={"flow": "IMPORT"}
+    )
+    assert r.status_code == 200
+    assert r.json()["widget"] == "product_mix"
+    assert r.json()["echarts"]["series"][0]["type"] == "pie"
+
+
+def test_avg_price_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/avg-price", params={"flow": "IMPORT", "months": 12}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["widget"] == "avg_price"
+    # 2024-01: (50M + 20M) / (4M + 2M) kg = 11.67 €/kg ; 2024-02: 60/5 = 12.0
+    assert body["echarts"]["series"][0]["data"] == [11.67, 12.0]
+
+
+def test_balance_endpoint(client):
+    r = client.get(
+        "/api/v1/reports/footwear/balance", params={"months": 12}
+    )
+    assert r.status_code == 200
+    assert r.json()["widget"] == "trade_balance"
+
+
+def test_index_hosts_the_reports_view(client):
+    # The shell is now thin: the reports tab and its widget REST paths are
+    # described by /api/app-config and rendered by chatkit.js.
+    r = client.get("/")
+    assert r.status_code == 200
+    assert 'import { boot } from "/_chatkit/chatkit.js"' in r.text
+
+    cfg = client.get("/api/app-config").json()
+    tab = next(t for t in cfg["tabs"] if t["id"] == "reports")
+    assert tab["kind"] == "widget_grid"
+    assert cfg["widgets"][tab["widgets"][0]]["rest_path"].startswith(
+        "/api/v1/reports/footwear/"
+    )

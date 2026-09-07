@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acceder</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="/_chatkit/chatkit.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="login">
+<div id="app"></div>
+<script type="module">
+  import { mountLogin } from "/_chatkit/chatkit.js";
+  mountLogin(document.getElementById("app"));
+</script>
+</body>
+</html>
