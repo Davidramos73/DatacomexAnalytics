@@ -1,8 +1,14 @@
 # chatkit — reusable core extraction
 
-**Status:** design approved in chat, spec under review
+**Status:** IMPLEMENTED and merged to `Calzados` (2026-09-07, merge `5db29c5`).
+Deviations from this design: the staged-shim migration (§13 steps 4–5) was done
+as one atomic move; `chatkit.js`/`.css` are served at `/_chatkit/*` from the
+package; `/filters/options` is emitted by `create_app` rather than a separate
+router. **Deferred to a follow-up:** the full `Settings` dataclass (§10) — the
+core still reads a module-level `chatkit/config.py`, marked with `# TODO(4.3)`;
+`SqlDomain` still imports `chatkit._demo.schema`.
 **Date:** 2026-09-06
-**Branch of work:** `Calzados` (footwear app is the reference implementation)
+**Branch of work:** `chatkit-extraction` off `Calzados` (footwear app is the reference implementation)
 
 ## 1. Goal
 

@@ -1,11 +1,23 @@
-# Agent Chat Analytics
+# chatkit + Analista de Calzado
 
-Multi-agent backend that answers natural-language questions about an analytics
-warehouse and returns an Apache ECharts chart, rendered by a minimal web UI.
+A reusable chat-analytics core (`chatkit`) and a thin deployable project built on
+it — **Analista de Calzado**, which answers natural-language questions about
+Spanish footwear foreign trade (DataComex, TARIC chapter 64) and returns an
+Apache ECharts chart, rendered by a minimal web UI.
 
-- **Orchestrator agent** — turns your question into data questions, then designs a chart.
-- **Data agent** — knows the schema, writes and runs read-only SQL against DuckDB.
-- **UI** — streams the tool-trace (schema lookup → SQL → chart) and renders the spec inline.
+- **`chatkit`** — a domain-agnostic package: a `Domain` protocol, a `create_app()`
+  factory, the LLM agent loop + SSE streaming, Google-login auth, a `Widget`
+  descriptor that generates the REST route + chat tool + frontend descriptor from
+  one declaration, and the deterministic ECharts option builder.
+- **`projects/footwear/`** — implements one `Domain` (`FootwearDomain`): the
+  DataComex SQL, five typed report tools, branding. `main.py` is
+  `app = create_app(FootwearDomain())`.
+- **UI** — a ~26-line project `index.html` that imports `chatkit.js` and is driven
+  entirely by `/api/app-config`; streams the tool-trace and renders each chart
+  inline with Chart / Spec / Data tabs.
+
+`chatkit` also ships an optional free-SQL `SqlDomain` (an orchestrator agent that
+writes read-only SQL and designs a chart) used by the `_demo` fixture domain.
 
 ## Layout
 
@@ -23,7 +35,7 @@ projects/footwear/    the thin deployable project: FootwearDomain + main.py
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e packages/chatkit
-cp .env.example .env    # then put your key in ANTHROPIC_API_KEY
+cp .env.example .env    # set LLM_PROVIDER + its API key (the deploy uses deepseek)
 ```
 
 ## Run locally
@@ -89,7 +101,7 @@ cookie. A gate middleware 401s API calls / redirects HTML without a session.
 ```bash
 pytest packages/chatkit/tests projects/footwear/tests -q   # both suites, no API key
 make check-deps                                            # dependency direction
-ANTHROPIC_API_KEY=sk-... pytest packages/chatkit/tests/test_integration.py
+node --test packages/chatkit/chatkit/frontend/             # chatkit.js unit tests
 ```
 
 ## Starting a new project on chatkit
