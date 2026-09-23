@@ -108,6 +108,19 @@ def test_evolution_filters_by_heading(con):
     assert out["echarts"]["series"][0]["data"] == [5.0]
 
 
+def test_evolution_filters_by_country(con):
+    _insert(
+        con,
+        _flow(period="2024-01", year=2024, month=1,
+              country_name="Alemania", value_eur=5_000_000),
+        _flow(period="2024-01", year=2024, month=1,
+              country_name="China", value_eur=99_000_000),
+    )
+    out = footwear.evolution(con, flow="IMPORT", country="Alemania", months=12)
+    assert out["echarts"]["series"][0]["data"] == [5.0]
+    assert "Alemania" in out["title"]
+
+
 def test_evolution_notes_flag_provisional(con):
     _insert(
         con,

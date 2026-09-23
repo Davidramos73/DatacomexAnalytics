@@ -24,6 +24,7 @@ _PARTIDA = Param(
     ui_options_from="partidas", ui_option_label="{code} — {description}",
     ui_default_label="Todos los componentes",
 )
+_COUNTRY = Param("country", "str", ui_label="País")
 
 WIDGETS: list[Widget] = [
     Widget(
@@ -31,9 +32,11 @@ WIDGETS: list[Widget] = [
         tool_name="footwear_market_overview",
         tool_description=(
             "Evolución mensual del valor de importaciones/exportaciones de "
-            "calzado, con variación interanual. Para 'tendencia', 'evolución'."
+            "calzado, con variación interanual. Para 'tendencia', 'evolución'. "
+            "Acepta `country` para acotar a un socio comercial concreto "
+            "(p. ej. 'exportaciones a Alemania en el tiempo')."
         ),
-        params=[_FLOW, _HEADING, _MONTHS, chart_type_param(["line", "bar"])],
+        params=[_FLOW, _HEADING, _COUNTRY, _MONTHS, chart_type_param(["line", "bar"])],
         chart_types=["line", "bar"], span="full",
     ),
     Widget(
@@ -61,9 +64,7 @@ WIDGETS: list[Widget] = [
         key="price", fn=footwear.avg_price, rest_path="/avg-price",
         tool_name="footwear_avg_price",
         tool_description="Precio medio implícito en €/kg a lo largo del tiempo.",
-        params=[_FLOW, _HEADING,
-                Param("country", "str", ui_label="País"),
-                _MONTHS, chart_type_param(["line", "bar"])],
+        params=[_FLOW, _HEADING, _COUNTRY, _MONTHS, chart_type_param(["line", "bar"])],
         chart_types=["line", "bar"], span="half",
     ),
     Widget(
@@ -85,9 +86,10 @@ WIDGETS: list[Widget] = [
             "componentes de calzado (materias primas: cauchos, plásticos, "
             "textiles, pieles, hormas, hebillas...), con variación "
             "interanual. Para preguntas sobre insumos, materia prima o "
-            "industria auxiliar del calzado, no calzado terminado."
+            "industria auxiliar del calzado, no calzado terminado. Acepta "
+            "`country` para acotar a un socio comercial concreto."
         ),
-        params=[_FLOW, _PARTIDA, _MONTHS, chart_type_param(["line", "bar"])],
+        params=[_FLOW, _PARTIDA, _COUNTRY, _MONTHS, chart_type_param(["line", "bar"])],
         chart_types=["line", "bar"], span="full",
     ),
     Widget(

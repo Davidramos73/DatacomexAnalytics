@@ -57,14 +57,17 @@ def filter_options(con) -> dict:
 
 
 def evolution(
-    con, *, flow: str, partida: str = "ALL", months: int = 24,
-    chart_type: str | None = None,
+    con, *, flow: str, partida: str = "ALL", country: str | None = None,
+    months: int = 24, chart_type: str | None = None,
 ) -> dict:
     """Monthly value trend for a flow + partida scope, with a YoY KPI."""
     series_type = _chart_type(chart_type, {"line", "bar"}, "line")
     pred, param = _scope(partida)
     where = f"flow = ? AND {pred}"
     args = [flow] + ([param] if param is not None else [])
+    if country:
+        where += " AND country_name = ?"
+        args.append(country)
 
     max_idx = con.execute(
         f"SELECT max(year * 12 + month) FROM datacomex.component_flows WHERE {where}",
@@ -102,9 +105,10 @@ def evolution(
     trailing = window_sum(12, 0)
     prior = window_sum(24, 12)
 
+    country_label = f" a/desde {country}" if country else ""
     return {
         "widget": "component_evolution",
-        "title": f"{_FLOW_LABEL.get(flow, flow)} {_partida_label(partida)} — últimos {months} meses",
+        "title": f"{_FLOW_LABEL.get(flow, flow)} {_partida_label(partida)}{country_label} — últimos {months} meses",
         "echarts": {
             "tooltip": {"trigger": "axis"},
             "xAxis": {"type": "category", "data": periods},

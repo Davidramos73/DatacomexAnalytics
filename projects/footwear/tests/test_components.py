@@ -56,6 +56,17 @@ def test_evolution_scopes_to_one_partida(con):
     assert out["echarts"]["series"][0]["data"] == [1.0]
 
 
+def test_evolution_filters_by_country(con):
+    _insert(
+        con,
+        _flow(country_name="Alemania", period="2025-01", month=1, value_eur=1_000_000),
+        _flow(country_name="China", period="2025-01", month=1, value_eur=5_000_000),
+    )
+    out = components.evolution(con, flow="IMPORT", country="Alemania")
+    assert out["echarts"]["series"][0]["data"] == [1.0]
+    assert "Alemania" in out["title"]
+
+
 def test_evolution_no_data_returns_empty_series(con):
     out = components.evolution(con, flow="EXPORT")
     assert out["echarts"]["series"][0]["data"] == []

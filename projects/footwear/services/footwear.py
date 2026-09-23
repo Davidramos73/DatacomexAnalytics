@@ -88,14 +88,17 @@ def filter_options(con) -> dict:
 
 
 def evolution(
-    con, *, flow: str, heading: str = "64", months: int = 24,
-    chart_type: str | None = None,
+    con, *, flow: str, heading: str = "64", country: str | None = None,
+    months: int = 24, chart_type: str | None = None,
 ) -> dict:
     """Monthly value trend for a flow + TARIC scope, with a year-on-year KPI."""
     series_type = _chart_type(chart_type, {"line", "bar"}, "line")
     pred, param = _scope(heading)
     where = f"flow = ? AND {pred}"
     args = [flow, param]
+    if country:
+        where += " AND country_name = ?"
+        args.append(country)
 
     max_idx = con.execute(
         f"SELECT max(year * 12 + month) FROM datacomex.trade_flows WHERE {where}",
@@ -134,9 +137,10 @@ def evolution(
     prior = window_sum(24, 12)
 
     scope_label = "de calzado" if len(heading) <= 2 else f"(partida {heading})"
+    country_label = f" a/desde {country}" if country else ""
     return {
         "widget": "monthly_evolution",
-        "title": f"{_FLOW_LABEL.get(flow, flow)} {scope_label} — últimos {months} meses",
+        "title": f"{_FLOW_LABEL.get(flow, flow)} {scope_label}{country_label} — últimos {months} meses",
         "echarts": {
             "tooltip": {"trigger": "axis"},
             "xAxis": {"type": "category", "data": periods},
