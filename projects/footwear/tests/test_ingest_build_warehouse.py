@@ -48,7 +48,7 @@ DATA = {
 
 def test_requests_periods_newest_first_within_range(tmp_path):
     client = _FakeClient(PERIODS, TREE, DATA)
-    build_warehouse.build(path=tmp_path / "real.duckdb", client=client, from_year=2023)
+    build_warehouse.build(path=tmp_path / "real.duckdb", client=client, from_year=2023, with_components=False)
     assert client.calls == ["202312", "202301"]
 
 
@@ -56,7 +56,7 @@ def test_build_writes_taric_tree_and_trade_flows(tmp_path):
     client = _FakeClient(PERIODS, TREE, DATA)
     path = tmp_path / "real.duckdb"
 
-    build_warehouse.build(path=path, client=client, from_year=2023)
+    build_warehouse.build(path=path, client=client, from_year=2023, with_components=False)
 
     con = duckdb.connect(str(path), read_only=True)
     try:
@@ -89,10 +89,48 @@ def test_build_writes_taric_tree_and_trade_flows(tmp_path):
 def test_build_is_resumable_by_overwriting_the_target(tmp_path):
     client = _FakeClient(PERIODS, TREE, DATA)
     path = tmp_path / "real.duckdb"
-    build_warehouse.build(path=path, client=client, from_year=2023)
-    build_warehouse.build(path=path, client=client, from_year=2023)  # must not crash
+    build_warehouse.build(path=path, client=client, from_year=2023, with_components=False)
+    build_warehouse.build(path=path, client=client, from_year=2023, with_components=False)  # must not crash
 
     con = duckdb.connect(str(path), read_only=True)
     (n,) = con.execute("SELECT COUNT(*) FROM datacomex.trade_flows").fetchone()
     con.close()
     assert n == 2  # not doubled
+
+
+# --------------------------------------------------------------------------- #
+# Bloque A: component ingest (with_components=True, the default)
+# --------------------------------------------------------------------------- #
+def test_build_with_components_pulls_one_call_per_partida_per_period(tmp_path):
+    from projects.footwear.warehouse.schema import COMPONENT_PARTIDAS
+
+    client = _FakeClient(PERIODS, TREE, DATA)
+    build_warehouse.build(
+        path=tmp_path / "real.duckdb", client=client, from_year=2023,
+    )
+    # 2 footwear calls + (70 partidas * 2 periods) component calls
+    assert len(client.calls) == 2 + len(COMPONENT_PARTIDAS) * 2
+
+
+def test_build_with_components_populates_component_flows(tmp_path):
+    client = _FakeClient(PERIODS, TREE, DATA)
+    path = tmp_path / "real.duckdb"
+    build_warehouse.build(path=path, client=client, from_year=2023)
+
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        rows = con.execute(
+            "SELECT flow, period, country_name, value_eur, weight_kg, "
+            "is_provisional FROM datacomex.component_flows "
+            "WHERE partida = '40011000' ORDER BY period"
+        ).fetchall()
+        assert rows == [
+            ("EXPORT", "2023-01", "Italia", 50.0, 5.0, True),
+            ("IMPORT", "2023-12", "Francia", 100.0, 10.0, False),
+        ]
+        meta = con.execute(
+            "SELECT rows_loaded FROM datacomex.meta_ingestion"
+        ).fetchone()[0]
+        assert meta > 2  # includes component rows, not just footwear's 2
+    finally:
+        con.close()

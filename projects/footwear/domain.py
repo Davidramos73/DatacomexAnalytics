@@ -13,7 +13,7 @@ import duckdb
 import chatkit.config as config
 from chatkit import events
 from chatkit.domain import AppConfig, Branding, TabDescriptor, default_finalize
-from projects.footwear.services import footwear
+from projects.footwear.services import components, footwear
 from projects.footwear.services.widgets import REST_PREFIX, WIDGETS
 
 _SYSTEM = """\
@@ -25,9 +25,16 @@ Reglas:
 - Si el usuario nombra un producto de forma coloquial ("deportivas", "botas de
   agua", "de cuero"...), llama PRIMERO a resolve_footwear_product para obtener la
   partida, y pásala como `heading` a la herramienta de informe.
+- Si el usuario pregunta por componentes, materia prima o insumos del calzado
+  (cauchos, plásticos, textiles, pieles, hormas, hebillas, suelas, plantillas...
+  la industria auxiliar, no el calzado terminado), usa las herramientas
+  components_* en vez de las de footwear_*.
 - Llama a EXACTAMENTE UNA herramienta de informe que responda a la pregunta:
-  footwear_market_overview (tendencia), footwear_top_partners (ranking),
-  footwear_product_mix, footwear_avg_price, footwear_trade_balance.
+  footwear_market_overview (tendencia calzado), footwear_top_partners
+  (ranking calzado), footwear_product_mix, footwear_avg_price,
+  footwear_trade_balance, components_market_overview (tendencia
+  componentes), components_top_partners (ranking componentes),
+  components_trade_balance.
 - No llames herramientas que no necesitas. En cuanto un informe responde, para.
 - Cada herramienta de informe SÍ genera un gráfico real (se muestra al usuario
   junto a tu respuesta) y acepta un parámetro `chart_type` para elegir el
@@ -52,6 +59,9 @@ _STEP_TITLES = {
     "footwear_product_mix": "Desglosando el mix de producto",
     "footwear_avg_price": "Calculando el precio medio",
     "footwear_trade_balance": "Calculando la balanza comercial",
+    "components_market_overview": "Analizando la evolución de componentes",
+    "components_top_partners": "Calculando el ranking de países (componentes)",
+    "components_trade_balance": "Calculando la balanza comercial de componentes",
 }
 
 _RESOLVE_DEF = {
@@ -80,6 +90,9 @@ _PROMPTS = [
     "¿Ha subido el precio medio del calzado de cuero en el último año?",
     "¿Cuál es la balanza comercial de calzado de España?",
     "¿Cuánto calzado deportivo importamos de Vietnam?",
+    "¿Cómo ha evolucionado la importación de componentes de calzado?",
+    "¿Quiénes son los principales proveedores de cuero para calzado?",
+    "¿Cuál es la balanza comercial de componentes de calzado?",
 ]
 
 _COPY = {
@@ -123,7 +136,15 @@ class FootwearDomain:
                     "reports", "Panel de reportes", "bars", "widget_grid",
                     widgets=["evolution", "countries", "mix", "price", "balance"],
                     filters=["flow", "heading", "months"],
-                )
+                ),
+                TabDescriptor(
+                    "components", "Componentes", "bars", "widget_grid",
+                    widgets=[
+                        "component_evolution", "component_countries",
+                        "component_balance",
+                    ],
+                    filters=["flow", "partida", "months"],
+                ),
             ],
             copy=dict(_COPY),
         )
@@ -167,6 +188,9 @@ class FootwearDomain:
         heading = tool_input.get("heading")
         if heading and heading != "64":
             bits.append(f"partida {heading}")
+        partida = tool_input.get("partida")
+        if partida and partida != "ALL":
+            bits.append(f"componente {partida}")
         if tool_input.get("top_n"):
             bits.append(f"top {tool_input['top_n']}")
         if tool_input.get("country"):
@@ -179,4 +203,4 @@ class FootwearDomain:
         return REST_PREFIX
 
     def filter_options(self, con) -> dict:
-        return footwear.filter_options(con)
+        return {**footwear.filter_options(con), **components.filter_options(con)}

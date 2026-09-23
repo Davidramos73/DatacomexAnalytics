@@ -55,3 +55,22 @@ def row_to_tuple(
         None,
         is_provisional(api_row.get("mensaje")),
     )
+
+
+def component_row_to_tuple(
+    api_row: dict, *, partida: str, flow: str, period: str, year: int, month: int
+) -> tuple:
+    """(flow, period, year, month, country_code, country_name, partida,
+    value_eur, weight_kg, is_provisional) — for datacomex.component_flows."""
+    return (
+        flow,
+        period,
+        year,
+        month,
+        api_row["id_pais"],
+        api_row["pais"],
+        partida,
+        parse_number(api_row.get("euros")),
+        parse_number(api_row.get("kilos")),
+        is_provisional(api_row.get("mensaje")),
+    )

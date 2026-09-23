@@ -45,7 +45,7 @@ def test_app_config_pins_downstream_shape(client):
     body = client.get("/api/app-config").json()
 
     fopts = body["filter_options"]
-    assert set(fopts) == {"periods", "headings", "countries"}
+    assert set(fopts) == {"periods", "headings", "countries", "partidas"}
     assert fopts["periods"] == ["2024-01"]
     assert fopts["countries"] == ["China"]
 

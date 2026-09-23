@@ -2,7 +2,7 @@ import duckdb
 import pytest
 
 from projects.footwear.warehouse import seed as datacomex_seed
-from projects.footwear.warehouse.schema import HEADINGS
+from projects.footwear.warehouse.schema import COMPONENT_PARTIDAS, HEADINGS
 
 
 @pytest.fixture(scope="module")
@@ -60,3 +60,28 @@ def test_only_the_latest_period_is_provisional(con):
     (max_period,) = con.execute(
         "SELECT MAX(period) FROM datacomex.trade_flows").fetchone()
     assert prov == {max_period}
+
+
+# --------------------------------------------------------------------------- #
+# Bloque A: component_flows
+# --------------------------------------------------------------------------- #
+def test_component_rows_are_deterministic():
+    assert datacomex_seed._component_rows() == datacomex_seed._component_rows()
+
+
+def test_component_flows_table_is_populated(con):
+    (n,) = con.execute(
+        "SELECT COUNT(*) FROM datacomex.component_flows").fetchone()
+    assert n > 0
+
+
+def test_component_flows_covers_every_partida(con):
+    partidas = {r[0] for r in con.execute(
+        "SELECT DISTINCT partida FROM datacomex.component_flows").fetchall()}
+    assert partidas == set(COMPONENT_PARTIDAS)
+
+
+def test_component_flows_both_flows_present(con):
+    flows = {r[0] for r in con.execute(
+        "SELECT DISTINCT flow FROM datacomex.component_flows").fetchall()}
+    assert flows == {"IMPORT", "EXPORT"}

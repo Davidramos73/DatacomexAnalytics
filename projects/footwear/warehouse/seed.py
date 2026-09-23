@@ -18,6 +18,7 @@ import duckdb
 import chatkit.config as config
 from chatkit.config import RANDOM_SEED
 from projects.footwear.warehouse.schema import (
+    COMPONENT_PARTIDAS,
     HEADINGS,
     SCHEMA_DDL,
     SUBHEADINGS,
@@ -98,6 +99,43 @@ def _rows() -> list[tuple]:
     return rows
 
 
+def _component_rows() -> list[tuple]:
+    """Synthetic Bloque A data: same shape/seasonality style as _rows(), but
+    keyed by TARIC partida (8 digits) instead of footwear heading, and
+    without suppl_units (DataComex components trade has no pairs)."""
+    rng = random.Random(RANDOM_SEED + 1)
+    periods = _periods()
+    max_period = periods[-1][0]
+    rows: list[tuple] = []
+
+    # deterministic per-partida scale, roughly matching the order of
+    # magnitude seen in the client's real export (hundreds of k€ to a few
+    # M€/year, most partidas much smaller)
+    partida_scale = {
+        code: rng.uniform(0.15, 3.0) for code in COMPONENT_PARTIDAS
+    }
+
+    for idx, (period, year, month) in enumerate(periods):
+        seasonal = 1.0 + 0.12 * math.sin(2 * math.pi * (month - 3) / 12)
+        trend = 1.0 + 0.004 * idx
+        for flow, pull_ix in (("IMPORT", 2), ("EXPORT", 3)):
+            for code, scale in partida_scale.items():
+                for iso, name, *pull in _COUNTRIES:
+                    base = pull[pull_ix - 2] * scale
+                    if base < 0.2:  # sparse tail, mirrors real "no partner" gaps
+                        continue
+                    noise = rng.uniform(0.75, 1.25)
+                    value = int(base * seasonal * trend * noise * 25_000)
+                    if value <= 0:
+                        continue
+                    weight = int(value / rng.uniform(6.0, 40.0))  # €/kg varies a lot by material
+                    rows.append((
+                        flow, period, year, month, iso, name, code,
+                        value, max(weight, 1), period == max_period,
+                    ))
+    return rows
+
+
 def _tree_rows() -> list[tuple]:
     rows = [("64", None, 2, "Calzado, polainas y artículos análogos; sus partes")]
     for heading, (desc, _) in HEADINGS.items():
@@ -118,6 +156,7 @@ def build(path: Path | None = None) -> None:
 
         tree = _tree_rows()
         rows = _rows()
+        component_rows = _component_rows()
 
         con.execute("BEGIN")
         con.executemany(
@@ -132,6 +171,15 @@ def build(path: Path | None = None) -> None:
             f"INSERT INTO datacomex.trade_flows ({cols}) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             rows,
+        )
+        component_cols = (
+            "flow, period, year, month, country_code, country_name, partida, "
+            "value_eur, weight_kg, is_provisional"
+        )
+        con.executemany(
+            f"INSERT INTO datacomex.component_flows ({component_cols}) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            component_rows,
         )
         con.execute(
             "INSERT INTO datacomex.meta_ingestion VALUES (?, ?, ?, ?, ?)",
